@@ -1,71 +1,53 @@
-# General data augmentation toolkit
+# 通用数据增强工具箱
 
-This folder is a task-agnostic copy of the CovidRetrieval data_augmentation code
-with extensions for SCIDOCS, AILA, and ArguAna. The goal is to control every
-path and prompt through a small set of scripts/configs instead of editing
-multiple files per task.
+本目录提供跨任务复用的数据增强脚本，已在 MIRACL、CovidRetrieval、AILA、SCIDOCS 与 ArguAna 等场景验证。目录结构经过整理，分为：
 
-## Key files
-- `task_configs.py`: single place to point each task to its corpus/qrels and
-  optional few-shot example roots. Override the environment variables
-  `DATA_AUG_ROOT` and `DATA_AUG_GENERATED_ROOT` or edit the constants once to
-  redirect all default paths.
-- `constant.py`: shared task definitions and prompt templates for query
-  generation and quality control.
-- `attributes_config.py`: attribute samplers and prompt snippets for each task
-  (Covid, AILA, SCIDOCS, ArguAna). Extend or modify the samplers to tune the
-  style of synthetic corpora.
-- `corpus_generator.py`: task-aware loader that filters the source corpus (and
-  qrels if provided) before query generation or corpus synthesis.
-- `triplet_generator.py`: uses the prompts in `constant.py` to turn seed
-  documents into (query, pos) training triples.
-- `doc_synthesis_generator.py`: uses the attribute samplers to rewrite or extend
-  the corpus from seed documents.
-- `run_generation.py`: entry point for generating query–document triplets.
-- `run_corpus_generation.py`: entry point for synthesising new corpus documents
-  from seeds.
+- `code/`：核心 Python 代码与示例。
+- `script/`：可直接运行的命令行脚本示例。
+- `README.md`：使用说明与流程概览。
 
-## Typical workflow
-1. **Configure datasets** once in `task_configs.py` (or pass `--corpus_path` / `--qrels_path` at runtime).
-   - CovidRetrieval comes with prefilled arrow paths; other tasks default to
-     `None` so you can plug in your own files.
-2. **Generate triplets** for a task:
+## 核心文件（位于 `code/`）
+- `task_configs.py`：集中管理各任务的语料、qrels 及少 shot 样例路径。可通过环境变量 `DATA_AUG_ROOT`、`DATA_AUG_GENERATED_ROOT` 或启动参数覆盖。
+- `constant.py`：任务枚举与通用提示模板（查询生成、文档改写等）。
+- `attributes_config.py`：统一的叙事属性采样器，支持在通用属性上叠加任务特定风格，用于控制文档改写的语气与结构。
+- `corpus_generator.py`：按任务加载与过滤语料（支持 qrels 过滤）。
+- `triplet_generator.py`：将语料转换为 (query, pos) 训练三元组。
+- `doc_synthesis_generator.py`：结合属性提示改写或扩展语料。
+- `run_generation.py`：查询–文档三元组生成入口。
+- `run_corpus_generation.py`：语料改写生成入口。
+
+`code/gen_examples/` 中包含少量示例，便于 Few-shot 生成。
+
+## 快速上手
+1. **配置数据路径**：修改或覆盖 `task_configs.py` 中的默认路径。
+2. **生成三元组**：
    ```bash
-   python run_generation.py \
+   python code/run_generation.py \
      --task_type covidretrieval \
      --language zh \
      --save_dir /path/to/save \
-     --corpus_path /custom/corpus.arrow \  # optional override
-     --qrels_path /custom/qrels.arrow    # optional override
+     --corpus_path /custom/corpus.arrow \   # 可选覆盖
+     --qrels_path /custom/qrels.arrow        # 可选覆盖
    ```
-   - Few-shot examples are discovered via `task_configs.py` unless you set
-     `--examples_dir` explicitly.
-   - Multi-round generation (`--num_rounds`) will auto-cycle narrative focuses
-     for CovidRetrieval and AILA.
-3. **Synthesize corpus documents** (optional pre-step for query generation):
+   - 未提供 `--examples_dir` 时，脚本会根据 `task_configs.py` 自动寻找少量示例。
+   - `--num_rounds` 可用于多轮生成，CovidRetrieval 等任务会自动轮换关注点。
+
+3. **改写语料（可选）**：
    ```bash
-   python run_corpus_generation.py \
+   python code/run_corpus_generation.py \
      --task_type arguana \
      --language en \
      --corpus_path /path/to/arguana.jsonl \
      --save_path /path/to/generated/arguana_synth.jsonl
    ```
-   - The synthesiser samples task-specific attributes from
-     `attributes_config.py` to diversify outputs.
+   - 改写时会自动采样叙事属性，以提升风格多样性。
 
-## How things fit together
-- `run_generation.py` loads a corpus via `CorpusGenerator`, optionally filters
-  with qrels, and fans out `TripletGenerator` workers to create training
-  triplets. Outputs are written to `<save_dir>/<language>/<task>/...`.
-- `run_corpus_generation.py` reuses the same corpus loader to get seed
-  documents, then `DocSynthesisGenerator` rewrites each seed with task-aware
-  attributes and format hints before saving a synthetic corpus JSONL file.
-- Both scripts are controlled by CLI flags so you can swap tasks, paths, or
-  model endpoints without touching internal modules.
+## 处理流程概览
+- `run_generation.py` 通过 `CorpusGenerator` 加载语料、分发到 `TripletGenerator`，最终将输出写入 `<save_dir>/<language>/<task>/...`。
+- `run_corpus_generation.py` 重用同一加载逻辑，随后由 `DocSynthesisGenerator` 在属性约束下改写语料并保存 JSONL。
+- 所有脚本均通过命令行参数控制，可快速切换任务、路径和模型端口。
 
-## Extending to new tasks
-- Add a `TaskType` entry in `constant.py` and update the generation/QC prompt
-  dictionaries.
-- Register corpus defaults in `task_configs.py`.
-- Provide an attribute sampler + hint renderer in `attributes_config.py` so the
-  synthesiser can steer style and content.
+## 扩展到新任务
+- 在 `constant.py` 中增加新的 `TaskType` 并补充提示模板。
+- 在 `task_configs.py` 注册默认语料与示例路径。
+- 在 `attributes_config.py` 为新任务添加特定属性选项，即可复用改写与生成流程。
