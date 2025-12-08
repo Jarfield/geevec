@@ -23,11 +23,12 @@ EXAMPLES_DIR="${EXAMPLES_DIR:-${DATA_AUG_ROOT:-${REPO_ROOT}}/data/examples/data_
 # 从命令行参数获取模式，默认为 "prod"
 MODE="${1:-prod}"
 
+SAVE_ROOT="${REPO_ROOT}/data/generated_data"
 # 根据传入的模式设置 SAVE_DIR
 if [ "$MODE" == "prod" ]; then
-  SAVE_DIR="${SAVE_ROOT}/prod/generation_results/prod_augmentation"
+  SAVE_DIR="${SAVE_ROOT}/${TASK_TYPE}/generation_results/prod_augmentation"
 elif [ "$MODE" == "test" ]; then
-  SAVE_DIR="${SAVE_ROOT}/test/generation_results/test_augmentation"
+  SAVE_DIR="${SAVE_ROOT}/${TASK_TYPE}/generation_results/test_augmentation"
 else
   echo "Invalid mode. Please use 'prod' or 'test'."
   exit 1
