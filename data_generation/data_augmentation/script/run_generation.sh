@@ -23,27 +23,6 @@ EXAMPLES_DIR="${EXAMPLES_DIR:-${DATA_AUG_ROOT:-${REPO_ROOT}}/data/examples/data_
 # 从命令行参数获取模式，默认为 "prod"
 MODE="${1:-prod}"
 
-# 根据传入的模式设置 SAVE_DIR
-if [ "$MODE" == "prod" ]; then
-  SAVE_DIR="${SAVE_ROOT}/prod/generation_results/prod_augmentation"
-elif [ "$MODE" == "test" ]; then
-  SAVE_DIR="${SAVE_ROOT}/test/generation_results/test_augmentation"
-else
-  echo "Invalid mode. Please use 'prod' or 'test'."
-  exit 1
-fi
-
-# 创建目录
-mkdir -p "${SAVE_DIR}"
-
-MODEL_NAME="${MODEL_NAME:-Qwen2-5-72B-Instruct}"
-MODEL_TYPE="${MODEL_TYPE:-open-source}"
-PORT="${PORT:-8000}"
-OVERWRITE=${OVERWRITE:-1}
-
-for LANGUAGE in "${LANGUAGES[@]}"; do
-    echo "Generating for language: ${LANGUAGE} (task: ${TASK_TYPE})"
-
 SAVE_ROOT="${REPO_ROOT}/data/generated_data"
 # 根据传入的模式设置 SAVE_DIR
 if [ "$MODE" == "prod" ]; then

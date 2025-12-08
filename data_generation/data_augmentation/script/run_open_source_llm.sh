@@ -8,7 +8,7 @@ PYTHON_BIN=${PYTHON_BIN:-python}
 MODEL_PATH="${MODEL_PATH:-/share/project/shared_models/Qwen2-5-72B-Instruct}"
 SERVE_NAME="${SERVE_NAME:-Qwen2-5-72B-Instruct}"
 MAX_LENGTH="${MAX_LENGTH:-32768}"
-PARALLEL_SIZE="${PARALLEL_SIZE:-6}"
+PARALLEL_SIZE="${PARALLEL_SIZE:-8}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.9}"
 DEPLOY_SCRIPT="${DEPLOY_SCRIPT:-${REPO_ROOT}/data_generation/code_for_AILAStatutes/vllm_deploy/run_open_source_llm.py}"
 
