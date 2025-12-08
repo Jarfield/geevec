@@ -46,6 +46,24 @@ DEFAULT_GENERATED_ROOT = os.environ.get(
 )
 
 
+def default_generated_corpus_path(task_type: str, language: str) -> str:
+    """Return the expected path for the synthesized corpus of a task.
+
+    The corpus synthesis step writes to
+    ``<DEFAULT_GENERATED_ROOT>/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl``.
+    Query generation should read from the same location by default to avoid
+    accidentally sampling the original corpus.
+    """
+
+    return os.path.join(
+        DEFAULT_GENERATED_ROOT,
+        task_type,
+        "generation_results",
+        "generated_corpus",
+        f"{language}_synth_corpus.jsonl",
+    )
+
+
 TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
     "covidretrieval": TaskDatasetConfig(
         corpus_path=os.path.join(
@@ -97,3 +115,13 @@ def get_task_config(task_type: str) -> TaskDatasetConfig:
         raise ValueError(
             f"Unknown task_type '{task_type}'. Please update TASK_DATASETS in task_configs.py."
         )
+
+
+__all__ = [
+    "TaskDatasetConfig",
+    "TASK_DATASETS",
+    "DEFAULT_DATA_ROOT",
+    "DEFAULT_GENERATED_ROOT",
+    "default_generated_corpus_path",
+    "get_task_config",
+]
