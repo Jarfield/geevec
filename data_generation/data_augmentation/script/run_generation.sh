@@ -2,13 +2,8 @@
 set -euo pipefail
 
 # Resolve repository root so the script works from anywhere.
-<<<<<<< HEAD
-REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
-CODE_DIR="${REPO_ROOT}/data_generation/data_augmentation/code"
-=======
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)
 CODE_DIR="${REPO_ROOT}/code/data_generation/data_augmentation/code"
->>>>>>> main
 cd "${CODE_DIR}"
 
 # Core toggles. Override them via environment variables, e.g.
@@ -22,13 +17,6 @@ NUM_VARIANTS_PER_DOC=${NUM_VARIANTS_PER_DOC:-1}
 NUM_ROUNDS=${NUM_ROUNDS:-5}
 NUM_PROCESSES=${NUM_PROCESSES:-8}
 
-<<<<<<< HEAD
-CACHE_DIR="${CACHE_DIR:-${REPO_ROOT}/.cache}"
-EXAMPLES_DIR="${EXAMPLES_DIR:-${DATA_AUG_ROOT:-${REPO_ROOT}}/data_generation/examples/data_generation}"
-
-CORPUS_PATH="${CORPUS_PATH:-}"
-QRELS_PATH="${QRELS_PATH:-}"
-=======
 CACHE_DIR="${CACHE_DIR:-${REPO_ROOT}/data/.cache}"
 EXAMPLES_DIR="${EXAMPLES_DIR:-${DATA_AUG_ROOT:-${REPO_ROOT}}/data/examples/data_generation}"
 
@@ -55,7 +43,6 @@ OVERWRITE=${OVERWRITE:-1}
 
 for LANGUAGE in "${LANGUAGES[@]}"; do
     echo "Generating for language: ${LANGUAGE} (task: ${TASK_TYPE})"
->>>>>>> main
 
 SAVE_ROOT="${REPO_ROOT}/data/generated_data"
 # 根据传入的模式设置 SAVE_DIR
