@@ -1,3 +1,7 @@
+"""基于 LLM 的通用文档改写器。"""
+
+"""面向多任务的数据增强：将种子文档改写为风格多样的新文档。"""
+
 import os
 import sys
 import random
@@ -6,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tqdm import tqdm
 
-# ---- Make project root & this folder importable ----
+# ---- 确保当前目录可被 import ----
 THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, "..", ".."))
 for _p in (ROOT_DIR, THIS_DIR):
@@ -58,7 +62,7 @@ def _split_title_desc(raw_text: str) -> (str, str):
 
 
 class DocSynthesisGenerator(LLM):
-    """LLM wrapper that synthesizes new documents for multiple tasks."""
+    """用于多任务文档改写的 LLM 封装。"""
 
     def __init__(
         self,
@@ -74,31 +78,15 @@ class DocSynthesisGenerator(LLM):
         seed_text: str,
         attr_bundle,
     ) -> str:
-        base_prompt = get_base_synthesis_prompt(task=task, seed_text=seed_text)
-        base_prompt = _trim_trailing_your_output(base_prompt)
+        """组装完整的改写提示。"""
 
-        attr_hint = attributes_to_hint_text(task.task_type, attr_bundle)
-
-        format_hint = f"""\
-Please follow this output format in {task.language.value} (keep the labels in English):
-
-Title: <one-line title>
-Desc: <multi-paragraph body; separate paragraphs with blank lines>
-"""
-
-        full_prompt = f"""{base_prompt}
-
-[High-level attribute constraints]
-{attr_hint}
-
-[Output format]
-{format_hint}
-
-Combine the reference style and the attributes, then provide the final result.
-
-Your output:
-"""
-        return full_prompt
+        attr_hint = attributes_to_hint_text(attr_bundle)
+        base_prompt = get_base_synthesis_prompt(
+            task=task,
+            seed_text=seed_text,
+            narrative_hint=attr_hint,
+        )
+        return _trim_trailing_your_output(base_prompt)
 
     def generate_single_doc(
         self,
