@@ -23,8 +23,10 @@
 2. **先生成合成语料（generated_corpus）**：
    ```bash
    cd data_generation/data_augmentation
-   TASK_TYPE=scidocs LANGUAGE=en \
-   NUM_VARIANTS_PER_SEED=2 NUM_THREADS=8 \
+   TASK_TYPE="covidretrieval" LANGUAGE="zh" \
+   NUM_VARIANTS_PER_SEED=2 \
+   NUM_THREADS=8 \
+   NUM_SEED_SAMPLES=1 \
    ./script/run_corpus.sh
    ```
    - 默认输出位于 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl`，可通过 `SAVE_ROOT` 覆盖。
@@ -66,8 +68,18 @@
 - **批量生成三元组**（切换到 SCIDOCS）：
   ```bash
   cd data_generation/data_augmentation
-  TASK_TYPE=scidocs LANGUAGES="en" \
-  SAVE_ROOT=/tmp/generated_data \
+  TASK_TYPE="covidretrieval" \
+  LANGUAGES="zh" \
+  NUM_EXAMPLES=10 \
+  NUM_SAMPLES=2 \
+  NUM_VARIANTS_PER_DOC=1 \
+  NUM_ROUNDS=2 \
+  NUM_PROCESSES=8 \
+  MODE="test" \
+  MODEL_NAME="Qwen2-5-72B-Instruct" \
+  MODEL_TYPE="open-source" \
+  PORT=8000 \
+  OVERWRITE=1 \
   ./script/run_generation.sh
   ```
   逻辑：脚本会进入 `code/` 目录，调用 `run_generation.py`，按语言循环生成并将结果写入 `${SAVE_ROOT}/${TASK_TYPE}/generation_results/prod_augmentation`。提示词会自动匹配 `TaskType.scidocs` 的生成模板。

@@ -23,8 +23,18 @@ EXAMPLES_DIR="${EXAMPLES_DIR:-${DATA_AUG_ROOT:-${REPO_ROOT}}/data_generation/exa
 CORPUS_PATH="${CORPUS_PATH:-}"
 QRELS_PATH="${QRELS_PATH:-}"
 
-SAVE_ROOT="${SAVE_ROOT:-${DATA_AUG_GENERATED_ROOT:-${REPO_ROOT}/data_generation/generated_data}}"
-SAVE_DIR="${SAVE_ROOT}/${TASK_TYPE}/generation_results/prod_augmentation"
+SAVE_ROOT="${REPO_ROOT}/data/generated_data"
+# 根据传入的模式设置 SAVE_DIR
+if [ "$MODE" == "prod" ]; then
+  SAVE_DIR="${SAVE_ROOT}/${TASK_TYPE}/generation_results/prod_augmentation"
+elif [ "$MODE" == "test" ]; then
+  SAVE_DIR="${SAVE_ROOT}/${TASK_TYPE}/generation_results/test_augmentation"
+else
+  echo "Invalid mode. Please use 'prod' or 'test'."
+  exit 1
+fi
+
+# 创建目录
 mkdir -p "${SAVE_DIR}"
 
 MODEL_NAME="${MODEL_NAME:-Qwen2-5-72B-Instruct}"

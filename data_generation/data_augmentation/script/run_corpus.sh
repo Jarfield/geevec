@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Resolve repository root and move into the code directory so imports work regardless of invocation location.
-REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
-CODE_DIR="${REPO_ROOT}/data_generation/data_augmentation/code"
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)
+CODE_DIR="${REPO_ROOT}/code/data_generation/data_augmentation/code"
 cd "${CODE_DIR}"
 
 # Core toggles (override via environment variables before running this script).
@@ -14,7 +14,7 @@ NUM_VARIANTS_PER_SEED=${NUM_VARIANTS_PER_SEED:-1}
 NUM_THREADS=${NUM_THREADS:-8}
 NUM_SEED_SAMPLES=${NUM_SEED_SAMPLES:--1}
 
-CACHE_DIR="${CACHE_DIR:-${REPO_ROOT}/.cache}"
+CACHE_DIR="${CACHE_DIR:-${REPO_ROOT}/data/.cache}"
 CORPUS_PATH="${CORPUS_PATH:-}"  # optional override
 QRELS_PATH="${QRELS_PATH:-}"    # optional override
 
