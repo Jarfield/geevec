@@ -1,56 +1,74 @@
-cd /data/share/project/psjin/code/data_generation/code_for_CovidRetrieval/data_augmentation
-python run_corpus_generation.py \
-  --task_type covidretrieval \
-  --language zh \
-  --cache_dir /data/share/project/psjin/data/.cache \
-  --model Qwen2-5-72B-Instruct \
-  --model_type open-source \
-  --port 8000 \
-  --num_variants_per_seed 50 \
-  --num_threads 8 \
-  --num_seed_samples -1 \
-  --overwrite
+#!/usr/bin/env bash
+set -euo pipefail
 
-task_type="covidretrieval"
-languages=("zh")
-num_examples=10
-num_samples=10000
-num_variants_per_doc=1
-num_rounds=5
+# Resolve repository root so the script works from anywhere.
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+CODE_DIR="${REPO_ROOT}/data_generation/data_augmentation/code"
+cd "${CODE_DIR}"
 
-cache_dir="/data/share/project/psjin/data/.cache"
-examples_dir="/data/share/project/psjin/data/examples/data_generation"
+# Core toggles. Override them via environment variables, e.g.
+#   TASK_TYPE=scidocs LANGUAGES="en" ./script/run_generation.sh
+TASK_TYPE="${TASK_TYPE:-covidretrieval}"
+LANGUAGES=(${LANGUAGES:-zh})
 
-save_dir="/data/share/project/psjin/data/generated_data/$task_type/generation_results/prod_augmentation"
+NUM_EXAMPLES=${NUM_EXAMPLES:-10}
+NUM_SAMPLES=${NUM_SAMPLES:-10000}
+NUM_VARIANTS_PER_DOC=${NUM_VARIANTS_PER_DOC:-1}
+NUM_ROUNDS=${NUM_ROUNDS:-5}
+NUM_PROCESSES=${NUM_PROCESSES:-8}
 
-mkdir -p $save_dir
-OVERWRITE=1
+CACHE_DIR="${CACHE_DIR:-${REPO_ROOT}/.cache}"
+EXAMPLES_DIR="${EXAMPLES_DIR:-${DATA_AUG_ROOT:-${REPO_ROOT}}/data_generation/examples/data_generation}"
 
-for language in "${languages[@]}"; do
-    echo "Generating for language: $language"
+CORPUS_PATH="${CORPUS_PATH:-}"
+QRELS_PATH="${QRELS_PATH:-}"
 
-    extra_args=""
+SAVE_ROOT="${SAVE_ROOT:-${DATA_AUG_GENERATED_ROOT:-${REPO_ROOT}/data_generation/generated_data}}"
+SAVE_DIR="${SAVE_ROOT}/${TASK_TYPE}/generation_results/prod_augmentation"
+mkdir -p "${SAVE_DIR}"
+
+MODEL_NAME="${MODEL_NAME:-Qwen2-5-72B-Instruct}"
+MODEL_TYPE="${MODEL_TYPE:-open-source}"
+PORT="${PORT:-8000}"
+OVERWRITE=${OVERWRITE:-1}
+
+for LANGUAGE in "${LANGUAGES[@]}"; do
+    echo "Generating for language: ${LANGUAGE} (task: ${TASK_TYPE})"
+
+    extra_args=()
     if [ "${OVERWRITE}" -eq 1 ]; then
-        extra_args="--overwrite"
+        extra_args+=("--overwrite")
     fi
 
-    cmd="python run_generation.py \
-    --task_type $task_type \
-    --save_dir $save_dir \
-    --examples_dir $examples_dir \
-    --num_examples $num_examples \
-    --cache_dir $cache_dir \
-    --language $language \
-    --num_samples $num_samples \
-    --num_variants_per_doc $num_variants_per_doc \
-    --model Qwen2-5-72B-Instruct \
-    --model_type open-source \
-    --port 8000 \
-    --num_processes 8 \
-    --num_rounds $num_rounds \
-    ${extra_args}
-    "
+    if [ -n "${CORPUS_PATH}" ]; then
+        extra_args+=("--corpus_path" "${CORPUS_PATH}")
+    fi
 
-    echo $cmd
-    eval $cmd 2>&1 | tee $save_dir/log_${language}_${task_type}.txt
+    if [ -n "${QRELS_PATH}" ]; then
+        extra_args+=("--qrels_path" "${QRELS_PATH}")
+    fi
+
+    cmd=(
+        python run_generation.py
+        --task_type "${TASK_TYPE}"
+        --save_dir "${SAVE_DIR}"
+        --examples_dir "${EXAMPLES_DIR}"
+        --num_examples "${NUM_EXAMPLES}"
+        --cache_dir "${CACHE_DIR}"
+        --language "${LANGUAGE}"
+        --num_samples "${NUM_SAMPLES}"
+        --num_variants_per_doc "${NUM_VARIANTS_PER_DOC}"
+        --model "${MODEL_NAME}"
+        --model_type "${MODEL_TYPE}"
+        --port "${PORT}"
+        --num_processes "${NUM_PROCESSES}"
+        --num_rounds "${NUM_ROUNDS}"
+    )
+
+    if [ ${#extra_args[@]} -gt 0 ]; then
+        cmd+=("${extra_args[@]}")
+    fi
+
+    echo "${cmd[@]}"
+    "${cmd[@]}" 2>&1 | tee "${SAVE_DIR}/log_${LANGUAGE}_${TASK_TYPE}.txt"
 done

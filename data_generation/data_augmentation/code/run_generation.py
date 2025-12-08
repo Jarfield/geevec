@@ -10,7 +10,7 @@ from typing import List, Optional
 from constant import TaskType, Language
 from corpus_generator import CorpusGenerator
 from triplet_generator import TripletGenerator
-from task_configs import get_task_config
+from task_configs import default_generated_corpus_path, get_task_config
 
 
 def compute_md5(text: str):
@@ -54,7 +54,7 @@ def get_args():
         '--corpus_path',
         type=str,
         default=None,
-        help='Optional override for corpus path. Defaults to task_configs.TASK_DATASETS.'
+        help='Optional override for corpus path. Defaults to the synthesized corpus under DATA_AUG_GENERATED_ROOT.'
     )
     parser.add_argument(
         '--qrels_path',
@@ -256,6 +256,19 @@ def main(args):
     num_processes = min(args.num_processes, int(mp.cpu_count() * 0.8))
     overwrite = args.overwrite
 
+    # Always default to the synthesized corpus produced by run_corpus_generation.
+    if args.corpus_path:
+        corpus_path = args.corpus_path
+        print(f"[INFO] Using user-provided corpus_path: {corpus_path}")
+    else:
+        corpus_path = default_generated_corpus_path(task_type, language)
+        if not os.path.exists(corpus_path):
+            raise FileNotFoundError(
+                f"No synthesized corpus found at {corpus_path}. "
+                "Please run script/run_corpus.sh first or pass --corpus_path explicitly."
+            )
+        print(f"[INFO] Using synthesized corpus from: {corpus_path}")
+
     # ===== Single-round old behavior: keep backward compatible =====
     if num_rounds == 1:
         save_path = get_save_path(save_dir, task_type, language)
@@ -299,7 +312,7 @@ def main(args):
     positives = corpus_generator.run(
         task_type=task_type,
         language=language,
-        corpus_path=args.corpus_path,
+        corpus_path=corpus_path,
         qrels_path=args.qrels_path,
         num_samples=num_samples,
     )
