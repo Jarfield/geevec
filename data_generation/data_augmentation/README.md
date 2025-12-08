@@ -115,6 +115,43 @@
 3. 改写语料阶段，`DocSynthesisGenerator` 为每条种子文档调用 `sample_attributes_for_task` 采样叙事风格，拼装 `get_base_synthesis_prompt`，并通过 `LLM.chat` 生成标题与正文，落盘时记录 `seed_id` 及属性以方便回溯。
 4. 生成的三元组按任务与语言分目录存储，后续 `run_hn_mine.sh` 可复用这些产物进行硬负例挖掘；`gen_examples/examples.py` 则提供少量示例，进一步加强 few-shot 效果。
 
+### 常见问题：使用改写语料时出现 “Extra data” 或 “Num positives used for generation: 0”
+
+`run_generation.py` 的默认逻辑已经固定为**只读取改写得到的合成语料（generated_corpus）**，路径为：
+`/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl`，并会在缺失时直接报错要求先跑 `run_corpus.sh`。
+
+如果按如下命令运行时遇到报错或 0 个正例：
+
+```bash
+cd data_generation/data_augmentation
+TASK_TYPE="covidretrieval" \\
+LANGUAGES="zh" \\
+NUM_EXAMPLES=10 \\
+NUM_SAMPLES=2 \\
+NUM_VARIANTS_PER_DOC=1 \\
+NUM_ROUNDS=2 \\
+NUM_PROCESSES=8 \\
+MODE="test" \\
+MODEL_NAME="Qwen2-5-72B-Instruct" \\
+MODEL_TYPE="open-source" \\
+PORT=8000 \\
+OVERWRITE=1 \\
+CORPUS_PATH="/data/share/project/psjin/data/generated_data/covidretrieval/generation_results/generated_corpus" \\
+./script/run_generation.sh
+```
+
+- **“Extra data: line 2 column 1”**：默认 few-shot 示例会从 `data/examples/data_generation/<task>/<lang>_sample_examples.json` 读取，如果文件被多次拼接或不是一个合法的 JSON 数组，`json.load` 会抛出这个错误。解决办法：
+  1) 打开对应示例文件，确认只保留一个 JSON 数组；
+  2) 或在命令里通过 `EXAMPLES_DIR=/path/to/clean/examples` 指向新的合法示例；
+  3) 也可暂时设置 `NUM_EXAMPLES=0` 关闭 few-shot（`examples_pool=None`）。
+
+- **“Num positives used for generation: 0”**：当传入的合成语料与 qrels 中的正例 ID 不匹配时，会被全部过滤掉。常见原因是只生成了少量合成文档或 ID 被修改。排查建议：
+  1) 检查 `generated_corpus/<lang>_synth_corpus.jsonl` 中的 `_id` 是否仍然对应 qrels 的 `pid`；
+  2) 若合成语料中的 ID 已变化，可在运行时显式关闭 qrels 过滤：`QRELS_PATH="" ./script/run_generation.sh`，或传入与合成语料配套的 qrels；
+  3) 确保 `NUM_SAMPLES` 足够大，避免只有极少合成文档时全部被过滤掉。
+
+一旦示例文件格式正确且合成语料与 qrels ID 对齐，`run_generation.sh` 将直接基于合成语料生成查询，无需额外调整。
+
 ## 代码文件与函数链路详解（改写语料）
 - `code/run_corpus_generation.py`：脚本入口，解析命令行后会：
   1. 根据 `task_configs.py` 的默认路径或 CLI 覆盖项，调用 `CorpusGenerator.run` 加载种子文档并可选按 qrels 过滤；
