@@ -90,7 +90,7 @@
 - **部署开源 LLM 服务**：
   ```bash
   cd data_generation/data_augmentation
-  MODEL_PATH=/models/Qwen2-5-72B-Instruct ./script/run_open_source_llm.sh
+  MODEL_PATH=/data/share/project/shared_models/Qwen2-5-72B-Instruct ./script/run_open_source_llm.sh
   ```
   逻辑：脚本将根目录固定后调用 `vllm_deploy/run_open_source_llm.py`，主要运行参数（模型路径、服务名、并行度、显存占用等）可在命令前通过环境变量调整。
 
