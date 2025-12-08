@@ -299,81 +299,81 @@ Your output:
 
     return prompt
 
-# def get_quality_control_prompt(
-#     task: Task,
-#     query: str,
-#     pos: str,
-# ) -> str:
-#     """
-#     构造一个分类 prompt，用于判断 (query, document) 是否匹配。
-#     """
-#     task_to_qc_mission: Dict[TaskType, Tuple[str, str, str, List[str]]] = {
-#         TaskType.miracl: (
-#             "judge whether the Wikipedia passage can answer the question",
-#             "the question",
-#             "the Wikipedia passage",
-#             [
-#                 "Yes, the Wikipedia passage can answer the question.",
-#                 "No, the Wikipedia passage cannot answer the question.",
-#             ],
-#         ),
-#         TaskType.covidretrieval: (
-#             "judge whether the COVID-19 news article can answer the question",
-#             "the question about COVID-19",
-#             "the news article related to COVID-19",
-#             [
-#                 "Yes, the news article can answer the question or provide direct information to address it.",
-#                 "No, the news article cannot answer the question or is only weakly or indirectly related.",
-#             ],
-#         ),
-#         TaskType.ailastatutes: (
-#             "judge whether the statute is directly applicable to the situation",
-#             "the situation",
-#             "the statute",
-#             [
-#                 "Yes, the statute applies directly to the described situation.",
-#                 "No, the statute does not apply or is only tangentially related.",
-#             ],
-#         ),
-#         TaskType.scidocs: (
-#             "judge whether the abstract discusses the topic asked by the research question",
-#             "the research question",
-#             "the scientific abstract",
-#             [
-#                 "Yes, the abstract clearly addresses or answers the research question.",
-#                 "No, the abstract does not answer the question or is only weakly related.",
-#             ],
-#         ),
-#         TaskType.arguana: (
-#             "judge whether the passage supports or contests the given claim",
-#             "the claim",
-#             "the argumentative passage",
-#             [
-#                 "Yes, the passage directly supports or contests the claim.",
-#                 "No, the passage is unrelated to the claim.",
-#             ],
-#         ),
-#     }
+def get_quality_control_prompt(
+    task: Task,
+    query: str,
+    pos: str,
+) -> str:
+    """
+    构造一个分类 prompt，用于判断 (query, document) 是否匹配。
+    """
+    task_to_qc_mission: Dict[TaskType, Tuple[str, str, str, List[str]]] = {
+        TaskType.miracl: (
+            "judge whether the Wikipedia passage can answer the question",
+            "the question",
+            "the Wikipedia passage",
+            [
+                "Yes, the Wikipedia passage can answer the question.",
+                "No, the Wikipedia passage cannot answer the question.",
+            ],
+        ),
+        TaskType.covidretrieval: (
+            "judge whether the COVID-19 news article can answer the question",
+            "the question about COVID-19",
+            "the news article related to COVID-19",
+            [
+                "Yes, the news article can answer the question or provide direct information to address it.",
+                "No, the news article cannot answer the question or is only weakly or indirectly related.",
+            ],
+        ),
+        TaskType.ailastatutes: (
+            "judge whether the statute is directly applicable to the situation",
+            "the situation",
+            "the statute",
+            [
+                "Yes, the statute applies directly to the described situation.",
+                "No, the statute does not apply or is only tangentially related.",
+            ],
+        ),
+        TaskType.scidocs: (
+            "judge whether the abstract discusses the topic asked by the research question",
+            "the research question",
+            "the scientific abstract",
+            [
+                "Yes, the abstract clearly addresses or answers the research question.",
+                "No, the abstract does not answer the question or is only weakly related.",
+            ],
+        ),
+        TaskType.arguana: (
+            "judge whether the passage supports or contests the given claim",
+            "the claim",
+            "the argumentative passage",
+            [
+                "Yes, the passage directly supports or contests the claim.",
+                "No, the passage is unrelated to the claim.",
+            ],
+        ),
+    }
 
-#     qc_mission, query_type, doc_type, qc_options = task_to_qc_mission[task.task_type]
+    qc_mission, query_type, doc_type, qc_options = task_to_qc_mission[task.task_type]
 
-#     pos_option = qc_options[0]
-#     neg_option = qc_options[1]
+    pos_option = qc_options[0]
+    neg_option = qc_options[1]
 
-#     qc_prompt = f"""\
-# Given an information retrieval task (Task), a query (Query), and a document (Document), your mission is to {qc_mission}.
+    qc_prompt = f"""\
+Given an information retrieval task (Task), a query (Query), and a document (Document), your mission is to {qc_mission}.
 
-# Task: {task.task_instruction}
-# Query ({query_type}):
-# {query}
-# Document ({doc_type}):
-# {pos}
-# Your output must be one of the following options:
-# - 0: {neg_option}
-# - 1: {pos_option}
+Task: {task.task_instruction}
+Query ({query_type}):
+{query}
+Document ({doc_type}):
+{pos}
+Your output must be one of the following options:
+- 0: {neg_option}
+- 1: {pos_option}
 
-# Do not explain your answer in the output. Your output must be a single number (0 or 1).
+Do not explain your answer in the output. Your output must be a single number (0 or 1).
 
-# Your output:"""
+Your output:"""
 
-#     return qc_prompt
+    return qc_prompt

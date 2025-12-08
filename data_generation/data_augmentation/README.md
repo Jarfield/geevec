@@ -23,28 +23,31 @@
 2. **先生成合成语料（generated_corpus）**：
    ```bash
    cd data_generation/data_augmentation
-   TASK_TYPE=scidocs LANGUAGE=en \
-   NUM_VARIANTS_PER_SEED=2 NUM_THREADS=8 \
+   TASK_TYPE="covidretrieval" LANGUAGE="zh" \
+   NUM_VARIANTS_PER_SEED=2 \
+   NUM_THREADS=8 \
+   NUM_SEED_SAMPLES=1 \
    ./script/run_corpus.sh
    ```
    - 默认输出位于 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl`，可通过 `SAVE_ROOT` 覆盖。
    - 若需要自定义底库或 qrels，可设置 `CORPUS_PATH=/path/to/corpus` 与 `QRELS_PATH=/path/to/qrels`。
 
-3. **基于改写语料生成三元组**：
+3. **基于改写语料生成三元组**（必须先跑完第 2 步的 `generated_corpus`）：
    ```bash
    python code/run_generation.py \
      --task_type covidretrieval \
      --language zh \
      --save_dir /path/to/save \
-     --corpus_path /custom/corpus.arrow \   # 可选覆盖
-     --qrels_path /custom/qrels.arrow        # 可选覆盖
+     # 如需改用其他语料，可显式传入 --corpus_path /custom/corpus.jsonl
    ```
+   - 默认会从 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl` 读取改写后的语料；
+     若文件不存在，脚本会报错并提示先运行 `script/run_corpus.sh`。
    - 未提供 `--examples_dir` 时，脚本会根据 `task_configs.py` 自动寻找少量示例。
    - `--num_rounds` 可用于多轮生成，CovidRetrieval 等任务会自动轮换关注点。
 
 ## 处理流程概览
 - `run_corpus_generation.py` 使用 `CorpusGenerator` 读取底库和可选 qrels，`DocSynthesisGenerator` 则为每条种子文档采样叙事属性（`attributes_config.py`）后，通过 LLM 改写并产出 `generated_corpus`。输出路径默认为 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus`。
-- `run_generation.py` 通过 `CorpusGenerator` 加载语料、分发到 `TripletGenerator`，最终将输出写入 `<save_dir>/<language>/<task>/...`。
+- `run_generation.py` 默认从第 2 步写出的 `generated_corpus/<lang>_synth_corpus.jsonl` 读取语料（路径由 `DATA_AUG_GENERATED_ROOT` 决定，缺失会直接报错），再分发到 `TripletGenerator`，最终将输出写入 `<save_dir>/<language>/<task>/...`。
 - 所有脚本均通过命令行参数控制，可快速切换任务、路径和模型端口。
 
 ## 扩展到新任务
@@ -65,15 +68,16 @@
 - **批量生成三元组**（切换到 SCIDOCS）：
   ```bash
   cd data_generation/data_augmentation
-  TASK_TYPE="covidretrieval"LANGUAGES="zh" \
+  TASK_TYPE="covidretrieval" \
+  LANGUAGES="zh" \
   NUM_EXAMPLES=10 \
-  NUM_SAMPLES=10000 \
+  NUM_SAMPLES=2 \
   NUM_VARIANTS_PER_DOC=1 \
-  NUM_ROUNDS=5 \
+  NUM_ROUNDS=2 \
   NUM_PROCESSES=8 \
-  MODE="prod" \
+  MODE="test" \
   MODEL_NAME="Qwen2-5-72B-Instruct" \
-  MODEL_TYPE="-open-source" \
+  MODEL_TYPE="open-source" \
   PORT=8000 \
   OVERWRITE=1 \
   ./script/run_generation.sh
