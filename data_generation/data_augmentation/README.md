@@ -65,7 +65,7 @@
 
 ### 典型用法
 
-- **批量生成三元组**（切换到 SCIDOCS）：
+- **批量生成三元组**（切换到 CovidRetrieval）：
   ```bash
   cd data_generation/data_augmentation
   TASK_TYPE="covidretrieval" \
@@ -80,9 +80,10 @@
   MODEL_TYPE="open-source" \
   PORT=8000 \
   OVERWRITE=1 \
+  CORPUS_PATH="/data/share/project/psjin/data/generated_data/covidretrieval/generation_results/generated_corpus"
   ./script/run_generation.sh
   ```
-  逻辑：脚本会进入 `code/` 目录，调用 `run_generation.py`，按语言循环生成并将结果写入 `${SAVE_ROOT}/${TASK_TYPE}/generation_results/prod_augmentation`。提示词会自动匹配 `TaskType.scidocs` 的生成模板。
+  逻辑：脚本会进入 `code/` 目录，调用 `run_generation.py`，按语言循环生成并将结果写入 `${SAVE_ROOT}/${TASK_TYPE}/generation_results/prod_augmentation`。提示词会自动匹配 `TaskType.covidretirieval` 的生成模板。
 
 - **生成 AILAStatutes few-shot 示例**：
   ```bash
