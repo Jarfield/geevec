@@ -20,7 +20,17 @@
 
 ## 快速上手
 1. **配置数据路径**：修改或覆盖 `task_configs.py` 中的默认路径。
-2. **生成三元组**：
+2. **先生成合成语料（generated_corpus）**：
+   ```bash
+   cd data_generation/data_augmentation
+   TASK_TYPE=scidocs LANGUAGE=en \
+   NUM_VARIANTS_PER_SEED=2 NUM_THREADS=8 \
+   ./script/run_corpus.sh
+   ```
+   - 默认输出位于 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl`，可通过 `SAVE_ROOT` 覆盖。
+   - 若需要自定义底库或 qrels，可设置 `CORPUS_PATH=/path/to/corpus` 与 `QRELS_PATH=/path/to/qrels`。
+
+3. **基于改写语料生成三元组**：
    ```bash
    python code/run_generation.py \
      --task_type covidretrieval \
@@ -32,19 +42,9 @@
    - 未提供 `--examples_dir` 时，脚本会根据 `task_configs.py` 自动寻找少量示例。
    - `--num_rounds` 可用于多轮生成，CovidRetrieval 等任务会自动轮换关注点。
 
-3. **改写语料（可选）**：
-   ```bash
-   python code/run_corpus_generation.py \
-     --task_type arguana \
-     --language en \
-     --corpus_path /path/to/arguana.jsonl \
-     --save_path /path/to/generated/arguana_synth.jsonl
-   ```
-   - 改写时会自动采样叙事属性，以提升风格多样性。
-
 ## 处理流程概览
+- `run_corpus_generation.py` 使用 `CorpusGenerator` 读取底库和可选 qrels，`DocSynthesisGenerator` 则为每条种子文档采样叙事属性（`attributes_config.py`）后，通过 LLM 改写并产出 `generated_corpus`。输出路径默认为 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus`。
 - `run_generation.py` 通过 `CorpusGenerator` 加载语料、分发到 `TripletGenerator`，最终将输出写入 `<save_dir>/<language>/<task>/...`。
-- `run_corpus_generation.py` 重用同一加载逻辑，随后由 `DocSynthesisGenerator` 在属性约束下改写语料并保存 JSONL。
 - 所有脚本均通过命令行参数控制，可快速切换任务、路径和模型端口。
 
 ## 扩展到新任务
@@ -107,4 +107,17 @@
 
 1. `run_generation.sh`/`run_corpus_generation.py` 读取 `task_configs.py`，确定当前 `task_type` 的语料、示例与过滤规则，并加载 `TaskType` 对应的提示模板（`constant.py`）。
 2. `CorpusGenerator` 根据配置加载或过滤语料，`TripletGenerator` 基于 `get_generation_prompt` 生成查询，提示会随 `task_type` 切换，从而同一套 pipeline 可直接输出 AILAStatutes 与 SCIDOCS 的查询。
-3. 生成的三元组按任务与语言分目录存储，后续 `run_hn_mine.sh` 可复用这些产物进行硬负例挖掘；`gen_examples/examples.py` 则提供少量示例，进一步加强 few-shot 效果。
+3. 改写语料阶段，`DocSynthesisGenerator` 为每条种子文档调用 `sample_attributes_for_task` 采样叙事风格，拼装 `get_base_synthesis_prompt`，并通过 `LLM.chat` 生成标题与正文，落盘时记录 `seed_id` 及属性以方便回溯。
+4. 生成的三元组按任务与语言分目录存储，后续 `run_hn_mine.sh` 可复用这些产物进行硬负例挖掘；`gen_examples/examples.py` 则提供少量示例，进一步加强 few-shot 效果。
+
+## 代码文件与函数链路详解（改写语料）
+- `code/run_corpus_generation.py`：脚本入口，解析命令行后会：
+  1. 根据 `task_configs.py` 的默认路径或 CLI 覆盖项，调用 `CorpusGenerator.run` 加载种子文档并可选按 qrels 过滤；
+  2. 初始化 `DocSynthesisGenerator`，并传入模型类型、端口等 LLM 配置；
+  3. 通过 `run(...)` 批量改写，传入线程数、每条种子生成的变体数量，最后将结果写入 `generated_corpus` 下的 JSONL。
+- `code/corpus_generator.py`：负责按任务读取底库 Arrow/JSONL，并使用 `task_configs.py` 中的字段映射（`text_key`、`id_key` 等）完成清洗、长度过滤和 qrels 正例过滤，返回统一格式的种子文档列表。
+- `code/doc_synthesis_generator.py`：承载主要的 LLM 调用逻辑。
+  - `_build_prompt` 会调用 `attributes_config.get_base_synthesis_prompt`，并附加 `attributes_to_hint_text` 返回的叙事提示，确保改写后的文档在语气、结构上与种子有明显差异。
+  - `generate_single_doc` 为每条种子采样属性（`sample_attributes_for_task`），并使用 `LLM.chat` 生成输出，随后解析 `title` 和 `desc` 字段并保留原始 `seed_id`。
+  - `run` 负责并行调度，将上述函数组合成线程池任务，最终返回包含属性与追溯信息的改写文档列表。
+- `code/attributes_config.py`：定义跨任务的叙事属性空间（风格、口吻、结构等），并提供 `sample_attributes_for_task`、`attributes_to_hint_text`、`get_base_synthesis_prompt` 等工具帮助构建 Prompt。
