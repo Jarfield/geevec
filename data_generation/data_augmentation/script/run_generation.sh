@@ -42,6 +42,11 @@ MODEL_TYPE="${MODEL_TYPE:-open-source}"
 PORT="${PORT:-8000}"
 OVERWRITE=${OVERWRITE:-1}
 
+# Ensure CORPUS_PATH and QRELS_PATH have defaults if not set
+CORPUS_PATH="${CORPUS_PATH:-}"
+QRELS_PATH="${QRELS_PATH:-}"
+
+# Generate for each language
 for LANGUAGE in "${LANGUAGES[@]}"; do
     echo "Generating for language: ${LANGUAGE} (task: ${TASK_TYPE})"
 
@@ -50,12 +55,17 @@ for LANGUAGE in "${LANGUAGES[@]}"; do
         extra_args+=("--overwrite")
     fi
 
-    if [ -n "${CORPUS_PATH}" ]; then
+    # Only add CORPUS_PATH and QRELS_PATH if they are set
+    if [ -n "${CORPUS_PATH}" ] && [ -f "${CORPUS_PATH}" ]; then
         extra_args+=("--corpus_path" "${CORPUS_PATH}")
+    elif [ -n "${CORPUS_PATH}" ]; then
+        echo "Warning: CORPUS_PATH is set but the file does not exist: ${CORPUS_PATH}"
     fi
 
-    if [ -n "${QRELS_PATH}" ]; then
+    if [ -n "${QRELS_PATH}" ] && [ -f "${QRELS_PATH}" ]; then
         extra_args+=("--qrels_path" "${QRELS_PATH}")
+    elif [ -n "${QRELS_PATH}" ]; then
+        echo "Warning: QRELS_PATH is set but the file does not exist: ${QRELS_PATH}"
     fi
 
     cmd=(
