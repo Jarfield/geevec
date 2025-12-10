@@ -1,188 +1,107 @@
-# 通用数据增强工具箱
+# 数据增强与查询生成指南
 
-本目录提供跨任务复用的数据增强脚本，已在 MIRACL、CovidRetrieval、AILA、SCIDOCS 与 ArguAna 等场景验证。目录结构经过整理，分为：
+本目录提供从“语料改写”到“查询生成”的完整流水线，主要包含两个脚本：
 
-- `code/`：核心 Python 代码与示例。
-- `script/`：可直接运行的命令行脚本示例。
-- `README.md`：使用说明与流程概览。
+- `code/run_corpus_generation.py`：将原始语料改写成合成语料（generated_corpus）。
+- `code/run_generation.py`：基于合成语料逐条生成查询-正例三元组。
 
-## 核心文件（位于 `code/`）
-- `task_configs.py`：集中管理各任务的语料、qrels 及少 shot 样例路径。可通过环境变量 `DATA_AUG_ROOT`、`DATA_AUG_GENERATED_ROOT` 或启动参数覆盖。
-- `constant.py`：任务枚举与通用提示模板（查询生成、文档改写等）。
-- `attributes_config.py`：统一的叙事属性采样器，支持在通用属性上叠加任务特定风格，用于控制文档改写的语气与结构。
-- `corpus_generator.py`：按任务加载与过滤语料（支持 qrels 过滤）。
-- `triplet_generator.py`：将语料转换为 (query, pos) 训练三元组。
-- `doc_synthesis_generator.py`：结合属性提示改写或扩展语料。
-- `run_generation.py`：查询–文档三元组生成入口。
-- `run_corpus_generation.py`：语料改写生成入口。
+下文按函数、脚本参数与使用示例展开说明，便于快速排查和二次开发。
 
-`code/gen_examples/` 中包含少量示例，便于 Few-shot 生成。
+## 主要函数职责
+- **`load_generated_corpus`（code/run_generation.py）**：读取 `run_corpus_generation.py` 产出的合成语料（`.jsonl` 或 Arrow`），只要含有 `text/desc` 字段即保留，可选 `num_samples` 截断。
+- **`load_examples_pool`（code/run_generation.py）**：加载 few-shot 示例，兼容 JSON / JSONL，并自动将不同字段名映射成 `{input, output}` 结构，缺失字段会被跳过。
+- **`gen_triplets`（code/run_generation.py` + `triplet_generator.py`）**：包装 `TripletGenerator.run`，按进程数并行生成查询与正例。
+- **`save_triplets` / `save_triplets_for_round`（code/run_generation.py）**：单轮 / 多轮模式下落盘三元组，自动创建目录并按语言、任务组织文件名。
+- **`TripletGenerator.generate_triplets`（code/triplet_generator.py）**：对单条文档构造 Prompt 并调用 `LLM.chat`；可选 few-shot 示例与叙事焦点（`narrative_focus`）。
+- **`TripletGenerator.run_single`**：提供缓存与重试入口；若指定 `cache_dir`，同一文档会复用历史生成结果。
+- **`TripletGenerator.run`**：线程池并行调度 `run_single`，并透传任务、语言、示例、变体数等参数。
+- **`CorpusGenerator.run`（code/corpus_generator.py）**：读取并清洗原始语料，可按 qrels 过滤正例；供 `run_corpus_generation.py` 调用。
+- **`DocSynthesisGenerator.run`（code/doc_synthesis_generator.py）**：基于采样的叙事属性（`attributes_config.py`）改写种子文档，产出 `title/desc` 字段的合成语料。
+
+## 脚本参数与含义
+### `code/run_corpus_generation.py`
+- `--task_type`：任务名，枚举见 `constant.TaskType`。
+- `--language`：语言（ISO 639-1 简写）。
+- `--save_path`：合成语料输出路径（默认 `DATA_AUG_GENERATED_ROOT/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl`）。
+- `--cache_dir`：生成缓存目录。
+- `--corpus_path`：自定义原始语料路径；默认读取 `task_configs.py` 中的配置。
+- `--qrels_path`：可选 qrels 路径，用于过滤正例。
+- `--num_variants_per_seed`：每条种子文档生成多少变体。
+- `--num_threads`：并行线程数。
+- `--num_seed_samples`：使用多少条种子文档（-1 表示全量）。
+- `--model` / `--model_type` / `--port`：LLM 名称、类型与 vLLM 端口。
+- `--overwrite`：若目标文件存在是否覆盖。
+
+### `code/run_generation.py`
+- `--task_type`：任务名，枚举见 `constant.TaskType`。
+- `--save_dir`：三元组输出根目录（结构为 `<save_dir>/<language>/<task>/<...>.jsonl`）。
+- `--examples_dir`：few-shot 示例根目录，若为空则使用 `task_configs` 默认路径。
+- `--num_examples`：每次生成使用的示例数量。
+- `--cache_dir`：生成缓存目录（也作为多轮缓存前缀）。
+- `--corpus_path`：合成语料路径，未提供时默认读取 `generated_corpus/<lang>_synth_corpus.jsonl`。
+- `--qrels_path`：已不再用于生成过滤，仅为兼容保留。
+- `--language`：语言（ISO 639-1）。
+- `--num_samples`：截取多少条合成语料参与生成；-1 表示全部。
+- `--model` / `--model_type` / `--port`：LLM 名称、类型与 vLLM 端口。
+- `--num_processes`：生成并行度（线程池大小）。
+- `--overwrite`：是否覆盖已存在的输出文件。
+- `--num_variants_per_doc`：单轮模式下每条文档生成多少条查询。
+- `--num_rounds`：多轮生成次数；>1 时每轮输出单独文件，并可按任务自动轮换 `narrative_focus`。
+
+### `script/run_corpus.sh`
+通过环境变量封装 `run_corpus_generation.py`，常用变量：
+- `TASK_TYPE`、`LANGUAGE`、`NUM_VARIANTS_PER_SEED`、`NUM_THREADS`、`NUM_SEED_SAMPLES`。
+- `CACHE_DIR`、`CORPUS_PATH`、`QRELS_PATH`、`SAVE_ROOT`。
+- `MODEL_NAME`、`MODEL_TYPE`、`PORT`、`OVERWRITE`（1 表示覆盖）。
+
+### `script/run_generation.sh`
+通过环境变量封装 `run_generation.py`，常用变量：
+- `TASK_TYPE`、`LANGUAGES`（可逗号分隔多语言）。
+- `NUM_EXAMPLES`、`NUM_SAMPLES`、`NUM_VARIANTS_PER_DOC`、`NUM_ROUNDS`、`NUM_PROCESSES`。
+- `CACHE_DIR`、`EXAMPLES_DIR`、`CORPUS_PATH`。
+- `MODEL_NAME`、`MODEL_TYPE`、`PORT`、`MODE`（影响 `save_dir` 子目录）、`OVERWRITE`。
 
 ## 快速上手
-1. **配置数据路径**：修改或覆盖 `task_configs.py` 中的默认路径。
-2. **先生成合成语料（generated_corpus）**：
+1. **生成合成语料**
    ```bash
    cd data_generation/data_augmentation
    TASK_TYPE="covidretrieval" LANGUAGE="zh" \
-   NUM_VARIANTS_PER_SEED=2 \
-   NUM_THREADS=8 \
-   NUM_SEED_SAMPLES=1 \
+   NUM_VARIANTS_PER_SEED=2 NUM_THREADS=8 NUM_SEED_SAMPLES=1 \
    ./script/run_corpus.sh
    ```
-   - 默认输出位于 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl`，可通过 `SAVE_ROOT` 覆盖。
-   - 若需要自定义底库或 qrels，可设置 `CORPUS_PATH=/path/to/corpus` 与 `QRELS_PATH=/path/to/qrels`。
+   输出：`DATA_AUG_GENERATED_ROOT/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl`。
 
-3. **基于改写语料生成三元组**（必须先跑完第 2 步的 `generated_corpus`）：
+2. **基于合成语料生成查询**（默认按语料顺序逐条生成，不做 qrels 过滤）
    ```bash
-   python code/run_generation.py \
+   cd data_generation/data_augmentation/code
+   python run_generation.py \
      --task_type covidretrieval \
      --language zh \
-     --save_dir /path/to/save \
-     # 如需改用其他语料，可显式传入 --corpus_path /custom/corpus.jsonl
+     --save_dir /data/share/project/psjin/data/generated_data/covidretrieval/generation_results/prod_augmentation \
+     --num_samples 100 \
+     --num_examples 10 \
+     --model Qwen2-5-72B-Instruct --model_type open-source --port 8000
    ```
-   - 默认会从 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl` 读取改写后的语料；
-     若文件不存在，脚本会报错并提示先运行 `script/run_corpus.sh`。
-   - 未提供 `--examples_dir` 时，脚本会根据 `task_configs.py` 自动寻找少量示例。
-   - `--num_rounds` 可用于多轮生成，CovidRetrieval 等任务会自动轮换关注点。
-   - **当前逻辑直接逐条遍历合成语料，不再基于 qrels 过滤或回查原始语料，确保与 `generated_corpus` 一一对应。**
+   - 若示例文件是 JSONL 或字段名为 `context/query`，无需修改格式，脚本会自动映射。
+   - 如需复用现有生成缓存，可设置 `--cache_dir`；多轮生成时会自动分轮使用不同缓存目录。
 
-## 完整 pipeline 与参数总览
-1. **运行 `script/run_corpus.sh`：** 先改写底库得到 `generated_corpus`，核心参数均可通过环境变量覆盖：
-   - `TASK_TYPE` / `LANGUAGE`：任务与语言。
-   - `NUM_VARIANTS_PER_SEED`、`NUM_THREADS`、`NUM_SEED_SAMPLES`：每条种子生成的变体数、线程数以及使用的种子数量（-1 表示全部）。
-   - `CACHE_DIR`、`CORPUS_PATH`、`QRELS_PATH`：可选缓存、底库和 qrels 覆盖路径。
-   - `MODEL_NAME`、`MODEL_TYPE`、`PORT`：调用的模型名称、类型与端口。
-   - `OVERWRITE`：是否覆盖已有的 `save_path`（1 表示覆盖）。
-   - `SAVE_ROOT`：输出根目录，默认为 `DATA_AUG_GENERATED_ROOT`。
+## 详细说明
+### 输入输出关系
+- **run_corpus_generation.py**：
+  - 输入：原始语料（`corpus_path` 或默认路径）、可选 qrels、模型信息。
+  - 输出：含 `title/desc`/`text` 的合成语料 JSONL（`generated_corpus`）。
+- **run_generation.py**：
+  - 输入：合成语料、可选 few-shot 示例、模型信息、生成参数。
+  - 输出：查询-正例三元组 JSONL，按任务与语言分目录存储；多轮模式会生成 `_round{idx}` 后缀文件。
 
-2. **运行 `code/run_corpus_generation.py`：** 脚本内部支持全部 CLI 参数覆写，包含：`--task_type`、`--language`、`--save_path`、`--cache_dir`、`--corpus_path`、`--qrels_path`、`--num_variants_per_seed`、`--num_threads`、`--num_seed_samples`、`--model`、`--model_type`、`--port`、`--overwrite`。
+### 常见排查
+- **示例字段不匹配导致报错**：`load_examples_pool` 会尝试从 `input/context/content/text/doc/document` 里取输入，`output/target/query/question/label` 里取输出；缺失会打印警告并跳过，不再因 KeyError 终止生成。
+- **没有生成任何三元组**：确认 `generated_corpus/<lang>_synth_corpus.jsonl` 存在且包含 `text/desc` 字段；`--num_samples` 不要设置为 0；确保 LLM 服务可用并端口正确。
+- **希望并发加速**：`--num_processes` 控制线程池大小，通常设置为 CPU 核心数的 70%-80% 即可。
 
-3. **运行 `script/run_generation.sh`：** 基于合成语料逐条生成查询，主要环境变量：
-   - `TASK_TYPE`、`LANGUAGES`：任务与待生成语言列表。
-   - `NUM_EXAMPLES`、`NUM_SAMPLES`、`NUM_VARIANTS_PER_DOC`、`NUM_ROUNDS`、`NUM_PROCESSES`：few-shot 示例数、使用的语料数（-1 全量）、每条语料的变体数、轮次、并行进程数。
-   - `CACHE_DIR`、`EXAMPLES_DIR`：缓存目录与示例目录。
-   - `MODE`：`prod` 或 `test`，影响保存目录。
-   - `MODEL_NAME`、`MODEL_TYPE`、`PORT`：模型配置。
-   - `OVERWRITE`：是否覆盖既有输出（1 表示覆盖）。
-   - `CORPUS_PATH`：合成语料路径；若传入 `QRELS_PATH` 也会被接受，但当前生成逻辑不会再用它做过滤。
+### 多轮生成的叙事焦点
+- `covidretrieval`：轮换 `covid_fact_detail`、`covid_policy_measure`、`covid_vaccine_treatment`、`covid_risk_protection`、`covid_social_impact`。
+- `ailastatutes`：轮换 `victim_focus`、`investigation_focus`、`judgment_focus`、`social_impact_focus`、`neutral_brief`。
+- 其他任务：默认不使用 `narrative_focus`，每轮仍会单独输出文件。
 
-4. **运行 `code/run_generation.py`：** 支持所有 CLI 参数显式传入，包含：`--task_type`、`--save_dir`、`--examples_dir`、`--num_examples`、`--cache_dir`、`--corpus_path`、`--qrels_path`（目前忽略过滤）、`--language`、`--num_samples`、`--model`、`--model_type`、`--port`、`--num_processes`、`--overwrite`、`--num_variants_per_doc`、`--num_rounds`。`--num_samples` >0 时按照语料原始顺序截取前 N 条，其余保持默认全量遍历。
-
-## 处理流程概览
-- `run_corpus_generation.py` 使用 `CorpusGenerator` 读取底库和可选 qrels，`DocSynthesisGenerator` 则为每条种子文档采样叙事属性（`attributes_config.py`）后，通过 LLM 改写并产出 `generated_corpus`。输出路径默认为 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus`。
-- `run_generation.py` 默认从第 2 步写出的 `generated_corpus/<lang>_synth_corpus.jsonl` 读取语料（路径由 `DATA_AUG_GENERATED_ROOT` 决定，缺失会直接报错），再分发到 `TripletGenerator`，最终将输出写入 `<save_dir>/<language>/<task>/...`。
-- 所有脚本均通过命令行参数控制，可快速切换任务、路径和模型端口。
-
-## 扩展到新任务
-- 在 `constant.py` 中增加新的 `TaskType` 并补充提示模板。
-- 在 `task_configs.py` 注册默认语料与示例路径。
-- 在 `attributes_config.py` 为新任务添加特定属性选项，即可复用改写与生成流程。
-
-## 运行脚本与任务切换
-
-仓库下的所有示例脚本都改为自动解析项目根目录，不再依赖硬编码路径，便于直接切换任务（例如在 AILAStatutes 与 SCIDOCS 间切换）。脚本位于 `script/`，核心思路如下：
-
-1. **统一入口与根目录**：脚本会计算 `REPO_ROOT=$(cd "$(dirname "$0")/../../.." && pwd)`，然后 `cd` 到该目录或 `code/` 子目录，确保相对路径生效。
-2. **环境变量驱动**：常用参数（任务、语言、模型、端口、缓存目录等）都可以通过环境变量覆盖，默认值覆盖了 CovidRetrieval 的生产配置。
-3. **Prompt 任务切换**：`run_generation.sh` 直接调用 `code/run_generation.py`，其中 `--task_type` 取值来自 `constant.py` 的 `TaskType`。脚本默认 `TASK_TYPE=covidretrieval`，可在命令前设置 `TASK_TYPE=scidocs` 或 `TASK_TYPE=ailastatutes`，即可复用相同的生成 prompt 去生产不同任务的数据。
-
-### 典型用法
-
-- **批量生成三元组**（切换到 CovidRetrieval）：
-  ```bash
-  cd data_generation/data_augmentation
-  TASK_TYPE="covidretrieval" \
-  LANGUAGES="zh" \
-  NUM_EXAMPLES=10 \
-  NUM_SAMPLES=2 \
-  NUM_VARIANTS_PER_DOC=1 \
-  NUM_ROUNDS=2 \
-  NUM_PROCESSES=8 \
-  MODE="test" \
-  MODEL_NAME="Qwen2-5-72B-Instruct" \
-  MODEL_TYPE="open-source" \
-  PORT=8000 \
-  OVERWRITE=1 \
-  CORPUS_PATH="/data/share/project/psjin/data/generated_data/covidretrieval/generation_results/generated_corpus"
-  ./script/run_generation.sh
-  ```
-  逻辑：脚本会进入 `code/` 目录，调用 `run_generation.py`，按语言循环生成并将结果写入 `${SAVE_ROOT}/${TASK_TYPE}/generation_results/prod_augmentation`。提示词会自动匹配 `TaskType.covidretirieval` 的生成模板。
-
-- **生成 AILAStatutes few-shot 示例**：
-  ```bash
-  cd data_generation/data_augmentation
-  EXAMPLES_SAVE_DIR=/tmp/generated_examples \
-  AILA_TRAIN_ROOT=/path/to/ailastatutes_dataset \
-  ./script/run_gen_examples.sh
-  ```
-  逻辑：脚本进入 `code/`，运行 `python -m gen_examples.examples --save_dir ...`。`examples.py` 支持通过命令行或环境变量覆盖训练集根目录、采样数量与语言列表，输出 JSON 示例供 `run_generation.py` few-shot 使用。
-
-- **硬负例挖掘**：
-  ```bash
-  cd data_generation/data_augmentation
-  TASK_TYPE=covidretrieval ROUNDS=3 ./script/run_hn_mine.sh
-  ```
-  逻辑：脚本固定到仓库根目录，按轮次读取 `prod_augmentation` 产出的三元组，调用 `mine_v2_modified.py` 构建索引并追加硬负例。各类路径（生成数据、索引目录、底库路径、模型名等）均支持环境变量覆盖。
-
-- **部署开源 LLM 服务**：
-  ```bash
-  cd data_generation/data_augmentation
-  MODEL_PATH=/data/share/project/shared_models/Qwen2-5-72B-Instruct ./script/run_open_source_llm.sh
-  ```
-  逻辑：脚本将根目录固定后调用 `vllm_deploy/run_open_source_llm.py`，主要运行参数（模型路径、服务名、并行度、显存占用等）可在命令前通过环境变量调整。
-
-### 代码运行链路概览
-
-1. `run_generation.sh`/`run_corpus_generation.py` 读取 `task_configs.py`，确定当前 `task_type` 的语料、示例与过滤规则，并加载 `TaskType` 对应的提示模板（`constant.py`）。
-2. `CorpusGenerator` 根据配置加载或过滤语料，`TripletGenerator` 基于 `get_generation_prompt` 生成查询，提示会随 `task_type` 切换，从而同一套 pipeline 可直接输出 AILAStatutes 与 SCIDOCS 的查询。
-3. 改写语料阶段，`DocSynthesisGenerator` 为每条种子文档调用 `sample_attributes_for_task` 采样叙事风格，拼装 `get_base_synthesis_prompt`，并通过 `LLM.chat` 生成标题与正文，落盘时记录 `seed_id` 及属性以方便回溯。
-4. 生成的三元组按任务与语言分目录存储，后续 `run_hn_mine.sh` 可复用这些产物进行硬负例挖掘；`gen_examples/examples.py` 则提供少量示例，进一步加强 few-shot 效果。
-
-### 常见问题：使用改写语料时出现 “Extra data” 或 “Num positives used for generation: 0”
-
-`run_generation.py` 的默认逻辑已经固定为**只读取改写得到的合成语料（generated_corpus）**，路径为：
-`/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus/<lang>_synth_corpus.jsonl`，并会在缺失时直接报错要求先跑 `run_corpus.sh`。
-
-如果按如下命令运行时遇到报错或 0 个正例：
-
-```bash
-cd data_generation/data_augmentation
-TASK_TYPE="covidretrieval" \\
-LANGUAGES="zh" \\
-NUM_EXAMPLES=10 \\
-NUM_SAMPLES=2 \\
-NUM_VARIANTS_PER_DOC=1 \\
-NUM_ROUNDS=2 \\
-NUM_PROCESSES=8 \\
-MODE="test" \\
-MODEL_NAME="Qwen2-5-72B-Instruct" \\
-MODEL_TYPE="open-source" \\
-PORT=8000 \\
-OVERWRITE=1 \\
-CORPUS_PATH="/data/share/project/psjin/data/generated_data/covidretrieval/generation_results/generated_corpus" \\
-./script/run_generation.sh
-```
-
-- **“Extra data: line 2 column 1”**：默认 few-shot 示例会从 `data/examples/data_generation/<task>/<lang>_sample_examples.json` 读取，如果文件被多次拼接或不是一个合法的 JSON 数组，`json.load` 会抛出这个错误。解决办法：
-  1) 打开对应示例文件，确认只保留一个 JSON 数组；
-  2) 或在命令里通过 `EXAMPLES_DIR=/path/to/clean/examples` 指向新的合法示例；
-  3) 也可暂时设置 `NUM_EXAMPLES=0` 关闭 few-shot（`examples_pool=None`）。
-
-  - **“Num positives used for generation: 0”**：当前生成逻辑直接读取合成语料，不再做 qrels 过滤。如果出现 0 条，通常意味着语料文件为空、`text` 字段缺失，或 `--num_samples` 截断过短。排查建议：
-    1) 检查 `generated_corpus/<lang>_synth_corpus.jsonl` 是否包含有效 `text` 字段；
-    2) 确认命令行未传入过小的 `--num_samples`；
-    3) 若需要重新生成，可先扩大种子数量或重新跑一次 `run_corpus.sh`。
-
-一旦示例文件格式正确且合成语料与 qrels ID 对齐，`run_generation.sh` 将直接基于合成语料生成查询，无需额外调整。
-
-## 代码文件与函数链路详解（改写语料）
-- `code/run_corpus_generation.py`：脚本入口，解析命令行后会：
-  1. 根据 `task_configs.py` 的默认路径或 CLI 覆盖项，调用 `CorpusGenerator.run` 加载种子文档并可选按 qrels 过滤；
-  2. 初始化 `DocSynthesisGenerator`，并传入模型类型、端口等 LLM 配置；
-  3. 通过 `run(...)` 批量改写，传入线程数、每条种子生成的变体数量，最后将结果写入 `generated_corpus` 下的 JSONL。
-- `code/corpus_generator.py`：负责按任务读取底库 Arrow/JSONL，并使用 `task_configs.py` 中的字段映射（`text_key`、`id_key` 等）完成清洗、长度过滤和 qrels 正例过滤，返回统一格式的种子文档列表。
-- `code/doc_synthesis_generator.py`：承载主要的 LLM 调用逻辑。
-  - `_build_prompt` 会调用 `attributes_config.get_base_synthesis_prompt`，并附加 `attributes_to_hint_text` 返回的叙事提示，确保改写后的文档在语气、结构上与种子有明显差异。
-  - `generate_single_doc` 为每条种子采样属性（`sample_attributes_for_task`），并使用 `LLM.chat` 生成输出，随后解析 `title` 和 `desc` 字段并保留原始 `seed_id`。
-  - `run` 负责并行调度，将上述函数组合成线程池任务，最终返回包含属性与追溯信息的改写文档列表。
-- `code/attributes_config.py`：定义跨任务的叙事属性空间（风格、口吻、结构等），并提供 `sample_attributes_for_task`、`attributes_to_hint_text`、`get_base_synthesis_prompt` 等工具帮助构建 Prompt。
+有任何新的数据格式或任务需求，可以在 `constant.py`/`task_configs.py` 中扩展任务枚举、提示模板与默认路径，即可复用同一套脚本完成生成。

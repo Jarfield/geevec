@@ -175,17 +175,18 @@ def load_generated_corpus(corpus_path: str, num_samples: int = -1) -> List[dict]
 
 
 def load_examples_pool(examples_path: str, sample_size: int = 30) -> Optional[List[dict]]:
-    """加载 few-shot 示例池，自动兼容 JSON / JSONL 等格式。
+    """加载 few-shot 示例池，自动兼容 JSON / JSONL，并容忍字段差异。
 
     输入：
     - examples_path：示例文件路径，既可能是一个 JSON list，也可能是逐行 JSON（JSONL）。
     - sample_size：最多抽取多少个示例进入内存，默认 30。
 
-    输出：若读取成功返回字典列表，否则返回 None。
+    输出：若读取成功返回**字段已对齐的**字典列表，否则返回 None。
     主要逻辑：
     1) 优先尝试 `json.load`（支持单个 list / dict）；
     2) 如果解析失败，再按逐行 JSON 解析并忽略空行；
-    3) 最后对有效列表进行随机抽样，保证与原逻辑一致。
+    3) 将读取到的对象统一映射为 `{input, output}` 结构，自动兼容 `context`、`content`、`target`、`query` 等字段名，缺失时跳过；
+    4) 最后对有效列表进行随机抽样，保证与原逻辑一致。
     """
 
     if not os.path.exists(examples_path):
@@ -223,14 +224,66 @@ def load_examples_pool(examples_path: str, sample_size: int = 30) -> Optional[Li
         print(f"[WARN] Failed to load examples from {examples_path}: {e}")
         return None
 
-    if len(examples) == 0:
+    def _normalize_example(example: dict) -> Optional[dict]:
+        """把不同字段名的示例映射成统一的 input/output。
+
+        - input 备选字段：`input`、`context`、`content`、`text`、`doc`、`document`。
+        - output 备选字段：`output`、`target`、`query`、`question`、`label`。
+
+        缺失任意一侧都会返回 None 并跳过。
+        """
+
+        input_candidates = [
+            "input",
+            "context",
+            "content",
+            "text",
+            "doc",
+            "document",
+        ]
+        output_candidates = [
+            "output",
+            "target",
+            "query",
+            "question",
+            "label",
+        ]
+
+        def _pick_first(keys):
+            for k in keys:
+                if k in example and example[k]:
+                    return example[k]
+            return None
+
+        normalized_input = _pick_first(input_candidates)
+        normalized_output = _pick_first(output_candidates)
+
+        if normalized_input is None or normalized_output is None:
+            print(
+                f"[WARN] Skip example lacking input/output fields: "
+                f"available keys = {list(example.keys())}"
+            )
+            return None
+
+        return {"input": normalized_input, "output": normalized_output}
+
+    normalized_examples: List[dict] = []
+    for ex in examples:
+        if not isinstance(ex, dict):
+            print(f"[WARN] Skip non-dict example: {ex}")
+            continue
+        normalized = _normalize_example(ex)
+        if normalized:
+            normalized_examples.append(normalized)
+
+    if len(normalized_examples) == 0:
         print(f"[WARN] No valid examples parsed from {examples_path}")
         return None
 
-    if len(examples) > sample_size:
-        examples = random.sample(examples, sample_size)
+    if len(normalized_examples) > sample_size:
+        normalized_examples = random.sample(normalized_examples, sample_size)
 
-    return examples
+    return normalized_examples
 
 
 def gen_triplets(
