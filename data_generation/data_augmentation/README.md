@@ -61,6 +61,35 @@
 - `CACHE_DIR`、`EXAMPLES_DIR`、`CORPUS_PATH`。
 - `MODEL_NAME`、`MODEL_TYPE`、`PORT`、`MODE`（影响 `save_dir` 子目录）、`OVERWRITE`。
 
+### `code/export_original_pairs.py` & `script/run_export_original.sh`
+将**原始元数据（非合成语料）**中 `score >= 1` 的 query-doc 正例抽取成 `{prompt, query, pos, neg}` JSONL，方便直接用测试集格式做训练对比。
+
+关键参数（CLI 或同名环境变量均可）：
+- `task_type` / `TASK_TYPE`：任务名，枚举见 `constant.TaskType`。
+- `language` / `LANGUAGE`：语言后缀，用于输出文件命名。
+- `corpus_path` / `CORPUS_PATH`：corpus 文件路径，默认来自 `task_configs`。
+- `queries_path` / `QUERIES_PATH`：query 文件路径，默认来自 `task_configs`。
+- `qrels_path` / `QRELS_PATH`：qrels 文件路径，默认来自 `task_configs`。
+- `corpus_id_key`、`corpus_text_key`、`corpus_title_key`：corpus 字段名；若提供 `title` 会与正文拼接。
+- `query_id_key`、`query_text_key`：query 文件的 id/text 字段名。
+- `qrels_qid_key`、`qrels_pid_key`、`qrels_score_key`：qrels 中的 query/doc/score 字段名。
+- `positive_score`：认定为正例的最小分数，默认 1。
+- `min_len`：过滤过短文档的最小长度（默认跟随 `task_configs`）。
+- `max_queries`：最多保留多少条 query（-1 表示全量）。
+- `save_root`：输出根目录，默认 `DATA_AUG_ORIGINAL_ROOT`（与 `generated_data` 同层的 `original_data`）。
+- `output_path`：完全自定义的输出路径，优先级最高。
+- `prompt`：输出中 `prompt` 字段的值，默认空字符串；
+- `overwrite` / `OVERWRITE`：已存在文件是否覆盖，1 表示覆盖。
+
+示例：
+```bash
+cd data_generation/data_augmentation
+TASK_TYPE="covidretrieval" LANGUAGE="zh" POSITIVE_SCORE=1 \
+QRELS_PATH="/path/to/qrels.arrow" QUERIES_PATH="/path/to/queries.arrow" \
+./script/run_export_original.sh
+# 输出：<DATA_AUG_ORIGINAL_ROOT>/covidretrieval/original_pairs/zh_original.jsonl
+```
+
 ## 快速上手
 1. **生成合成语料**
    ```bash
