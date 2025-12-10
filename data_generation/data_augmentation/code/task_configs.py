@@ -19,20 +19,28 @@ class TaskDatasetConfig:
 
     Attributes:
         corpus_path: Path to the corpus file to sample positives from.
+        queries_path: Path to the query file that pairs with the qrels file.
         qrels_path: Optional qrels file used to keep only positive documents.
         min_len: Minimum length (characters) to keep a document.
         id_key: Field name for document id in the corpus file.
         text_key: Field name for document text in the corpus file.
+        query_id_key: Field name for query id in the queries file.
+        query_text_key: Field name for query text in the queries file.
+        qrels_qid_key: Field name for query id inside the qrels file.
         qrels_pid_key: Field name for passage id inside the qrels file.
         qrels_score_key: Field name for the relevance score inside the qrels file.
         examples_dir: Optional directory that stores few-shot examples.
     """
 
     corpus_path: Optional[str]
+    queries_path: Optional[str] = None
     qrels_path: Optional[str] = None
     min_len: int = 200
     id_key: str = "id"
     text_key: str = "text"
+    query_id_key: str = "id"
+    query_text_key: str = "text"
+    qrels_qid_key: str = "qid"
     qrels_pid_key: str = "pid"
     qrels_score_key: str = "score"
     examples_dir: Optional[str] = None
@@ -43,6 +51,10 @@ DEFAULT_DATA_ROOT = os.environ.get("DATA_AUG_ROOT", "/data/share/project/shared_
 DEFAULT_GENERATED_ROOT = os.environ.get(
     "DATA_AUG_GENERATED_ROOT",
     "/data/share/project/psjin/data/generated_data",
+)
+DEFAULT_ORIGINAL_ROOT = os.environ.get(
+    "DATA_AUG_ORIGINAL_ROOT",
+    os.path.join(os.path.dirname(DEFAULT_GENERATED_ROOT.rstrip(os.sep)), "original_data"),
 )
 
 
@@ -70,6 +82,10 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
             DEFAULT_DATA_ROOT,
             "MMTEB/C-MTEB___covid_retrieval/default/0.0.0/1271c7809071a13532e05f25fb53511ffce77117/covid_retrieval-corpus.arrow",
         ),
+        queries_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "MMTEB/C-MTEB___covid_retrieval/default/0.0.0/1271c7809071a13532e05f25fb53511ffce77117/covid_retrieval-queries.arrow",
+        ),
         qrels_path=os.path.join(
             DEFAULT_DATA_ROOT,
             "MMTEB/C-MTEB___covid_retrieval-qrels/default/0.0.0/a9f41b7cdf24785531d12417ce0d1157ed4b39ca/covid_retrieval-qrels-dev.arrow",
@@ -77,6 +93,10 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
         min_len=200,
         text_key="text",
         id_key="id",
+        query_id_key="id",
+        query_text_key="text",
+        qrels_qid_key="qid",
+        qrels_pid_key="pid",
         examples_dir=os.path.join(DEFAULT_DATA_ROOT, "data_generation/examples"),
     ),
     # Leave corpus/qrels as None for tasks where the source varies; provide them
@@ -122,6 +142,7 @@ __all__ = [
     "TASK_DATASETS",
     "DEFAULT_DATA_ROOT",
     "DEFAULT_GENERATED_ROOT",
+    "DEFAULT_ORIGINAL_ROOT",
     "default_generated_corpus_path",
     "get_task_config",
 ]
