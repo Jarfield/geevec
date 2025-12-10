@@ -44,6 +44,29 @@
      若文件不存在，脚本会报错并提示先运行 `script/run_corpus.sh`。
    - 未提供 `--examples_dir` 时，脚本会根据 `task_configs.py` 自动寻找少量示例。
    - `--num_rounds` 可用于多轮生成，CovidRetrieval 等任务会自动轮换关注点。
+   - **当前逻辑直接逐条遍历合成语料，不再基于 qrels 过滤或回查原始语料，确保与 `generated_corpus` 一一对应。**
+
+## 完整 pipeline 与参数总览
+1. **运行 `script/run_corpus.sh`：** 先改写底库得到 `generated_corpus`，核心参数均可通过环境变量覆盖：
+   - `TASK_TYPE` / `LANGUAGE`：任务与语言。
+   - `NUM_VARIANTS_PER_SEED`、`NUM_THREADS`、`NUM_SEED_SAMPLES`：每条种子生成的变体数、线程数以及使用的种子数量（-1 表示全部）。
+   - `CACHE_DIR`、`CORPUS_PATH`、`QRELS_PATH`：可选缓存、底库和 qrels 覆盖路径。
+   - `MODEL_NAME`、`MODEL_TYPE`、`PORT`：调用的模型名称、类型与端口。
+   - `OVERWRITE`：是否覆盖已有的 `save_path`（1 表示覆盖）。
+   - `SAVE_ROOT`：输出根目录，默认为 `DATA_AUG_GENERATED_ROOT`。
+
+2. **运行 `code/run_corpus_generation.py`：** 脚本内部支持全部 CLI 参数覆写，包含：`--task_type`、`--language`、`--save_path`、`--cache_dir`、`--corpus_path`、`--qrels_path`、`--num_variants_per_seed`、`--num_threads`、`--num_seed_samples`、`--model`、`--model_type`、`--port`、`--overwrite`。
+
+3. **运行 `script/run_generation.sh`：** 基于合成语料逐条生成查询，主要环境变量：
+   - `TASK_TYPE`、`LANGUAGES`：任务与待生成语言列表。
+   - `NUM_EXAMPLES`、`NUM_SAMPLES`、`NUM_VARIANTS_PER_DOC`、`NUM_ROUNDS`、`NUM_PROCESSES`：few-shot 示例数、使用的语料数（-1 全量）、每条语料的变体数、轮次、并行进程数。
+   - `CACHE_DIR`、`EXAMPLES_DIR`：缓存目录与示例目录。
+   - `MODE`：`prod` 或 `test`，影响保存目录。
+   - `MODEL_NAME`、`MODEL_TYPE`、`PORT`：模型配置。
+   - `OVERWRITE`：是否覆盖既有输出（1 表示覆盖）。
+   - `CORPUS_PATH`：合成语料路径；若传入 `QRELS_PATH` 也会被接受，但当前生成逻辑不会再用它做过滤。
+
+4. **运行 `code/run_generation.py`：** 支持所有 CLI 参数显式传入，包含：`--task_type`、`--save_dir`、`--examples_dir`、`--num_examples`、`--cache_dir`、`--corpus_path`、`--qrels_path`（目前忽略过滤）、`--language`、`--num_samples`、`--model`、`--model_type`、`--port`、`--num_processes`、`--overwrite`、`--num_variants_per_doc`、`--num_rounds`。`--num_samples` >0 时按照语料原始顺序截取前 N 条，其余保持默认全量遍历。
 
 ## 处理流程概览
 - `run_corpus_generation.py` 使用 `CorpusGenerator` 读取底库和可选 qrels，`DocSynthesisGenerator` 则为每条种子文档采样叙事属性（`attributes_config.py`）后，通过 LLM 改写并产出 `generated_corpus`。输出路径默认为 `/data/share/project/psjin/data/generated_data/<task>/generation_results/generated_corpus`。
@@ -145,10 +168,10 @@ CORPUS_PATH="/data/share/project/psjin/data/generated_data/covidretrieval/genera
   2) 或在命令里通过 `EXAMPLES_DIR=/path/to/clean/examples` 指向新的合法示例；
   3) 也可暂时设置 `NUM_EXAMPLES=0` 关闭 few-shot（`examples_pool=None`）。
 
-- **“Num positives used for generation: 0”**：当传入的合成语料与 qrels 中的正例 ID 不匹配时，会被全部过滤掉。常见原因是只生成了少量合成文档或 ID 被修改。排查建议：
-  1) 检查 `generated_corpus/<lang>_synth_corpus.jsonl` 中的 `_id` 是否仍然对应 qrels 的 `pid`；
-  2) 若合成语料中的 ID 已变化，可在运行时显式关闭 qrels 过滤：`QRELS_PATH="" ./script/run_generation.sh`，或传入与合成语料配套的 qrels；
-  3) 确保 `NUM_SAMPLES` 足够大，避免只有极少合成文档时全部被过滤掉。
+  - **“Num positives used for generation: 0”**：当前生成逻辑直接读取合成语料，不再做 qrels 过滤。如果出现 0 条，通常意味着语料文件为空、`text` 字段缺失，或 `--num_samples` 截断过短。排查建议：
+    1) 检查 `generated_corpus/<lang>_synth_corpus.jsonl` 是否包含有效 `text` 字段；
+    2) 确认命令行未传入过小的 `--num_samples`；
+    3) 若需要重新生成，可先扩大种子数量或重新跑一次 `run_corpus.sh`。
 
 一旦示例文件格式正确且合成语料与 qrels ID 对齐，`run_generation.sh` 将直接基于合成语料生成查询，无需额外调整。
 
