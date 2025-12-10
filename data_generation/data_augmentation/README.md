@@ -81,6 +81,8 @@
 - `prompt`：输出中 `prompt` 字段的值，默认空字符串；
 - `overwrite` / `OVERWRITE`：已存在文件是否覆盖，1 表示覆盖。
 
+所有任务的数据路径与字段名已集中在 `code/task_configs.py` 中（covidretrieval / arguana / scidocs / ailastatutes 已填好默认路径），通常只需指定 `TASK_TYPE` 与 `LANGUAGE` 即可运行脚本，无需再手动传入 corpus/queries/qrels 参数。
+
 示例：
 ```bash
 cd data_generation/data_augmentation

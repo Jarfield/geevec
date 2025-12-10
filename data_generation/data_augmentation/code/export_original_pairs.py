@@ -135,7 +135,7 @@ def main():
 
     corpus_id_key = args.corpus_id_key or cfg.id_key
     corpus_text_key = args.corpus_text_key or cfg.text_key
-    corpus_title_key = args.corpus_title_key
+    corpus_title_key = args.corpus_title_key or cfg.title_key
     query_id_key = args.query_id_key or cfg.query_id_key
     query_text_key = args.query_text_key or cfg.query_text_key
     qrels_qid_key = args.qrels_qid_key or cfg.qrels_qid_key

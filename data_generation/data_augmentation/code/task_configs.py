@@ -24,6 +24,7 @@ class TaskDatasetConfig:
         min_len: Minimum length (characters) to keep a document.
         id_key: Field name for document id in the corpus file.
         text_key: Field name for document text in the corpus file.
+        title_key: Optional field name for document title in the corpus file.
         query_id_key: Field name for query id in the queries file.
         query_text_key: Field name for query text in the queries file.
         qrels_qid_key: Field name for query id inside the qrels file.
@@ -38,6 +39,7 @@ class TaskDatasetConfig:
     min_len: int = 200
     id_key: str = "id"
     text_key: str = "text"
+    title_key: Optional[str] = None
     query_id_key: str = "id"
     query_text_key: str = "text"
     qrels_qid_key: str = "qid"
@@ -55,6 +57,21 @@ DEFAULT_GENERATED_ROOT = os.environ.get(
 DEFAULT_ORIGINAL_ROOT = os.environ.get(
     "DATA_AUG_ORIGINAL_ROOT",
     os.path.join(os.path.dirname(DEFAULT_GENERATED_ROOT.rstrip(os.sep)), "original_data"),
+)
+
+ARGUANA_DATA_ROOT = os.path.join(
+    DEFAULT_DATA_ROOT,
+    "shared_models/datasets--mteb--arguana/snapshots/c22ab2a51041ffd869aaddef7af8d8215647e41a",
+)
+
+SCIDOCS_DATA_ROOT = os.path.join(
+    DEFAULT_DATA_ROOT,
+    "mteb/datasets--mteb--scidocs/snapshots/f8c2fcf00f625baaa80f62ec5bd9e1fff3b8ae88",
+)
+
+AILA_STATUTES_DATA_ROOT = os.path.join(
+    DEFAULT_DATA_ROOT,
+    "shared_models/datasets--mteb--AILA_statutes/snapshots/ac23c06b6894334dd025491c6abc96ef516aad2b",
 )
 
 
@@ -99,31 +116,47 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
         qrels_pid_key="pid",
         examples_dir=os.path.join(DEFAULT_DATA_ROOT, "data_generation/examples"),
     ),
-    # Leave corpus/qrels as None for tasks where the source varies; provide them
-    # via CLI or by editing this config once.
     "scidocs": TaskDatasetConfig(
-        corpus_path=None,
-        qrels_path=None,
-        min_len=120,
-        text_key="text",
-        id_key="id",
-    ),
-    "arguana": TaskDatasetConfig(
-        corpus_path=None,
-        qrels_path=None,
-        min_len=80,
-        text_key="text",
-        id_key="id",
-    ),
-    "ailastatutes": TaskDatasetConfig(
-        corpus_path=os.path.join(
-            DEFAULT_GENERATED_ROOT,
-            "ailastatutes/generation_results/generated_corpus/en_synth_corpus.jsonl",
-        ),
-        qrels_path=None,
+        corpus_path=os.path.join(SCIDOCS_DATA_ROOT, "corpus.jsonl"),
+        queries_path=os.path.join(SCIDOCS_DATA_ROOT, "queries.jsonl"),
+        qrels_path=os.path.join(SCIDOCS_DATA_ROOT, "qrels/test.jsonl"),
         min_len=200,
         text_key="text",
+        title_key="title",
         id_key="_id",
+        query_id_key="_id",
+        query_text_key="text",
+        qrels_qid_key="query-id",
+        qrels_pid_key="corpus-id",
+        qrels_score_key="score",
+    ),
+    "arguana": TaskDatasetConfig(
+        corpus_path=os.path.join(ARGUANA_DATA_ROOT, "corpus.jsonl"),
+        queries_path=os.path.join(ARGUANA_DATA_ROOT, "queries.jsonl"),
+        qrels_path=os.path.join(ARGUANA_DATA_ROOT, "qrels/test.jsonl"),
+        min_len=200,
+        text_key="text",
+        title_key="title",
+        id_key="_id",
+        query_id_key="_id",
+        query_text_key="text",
+        qrels_qid_key="query-id",
+        qrels_pid_key="corpus-id",
+        qrels_score_key="score",
+    ),
+    "ailastatutes": TaskDatasetConfig(
+        corpus_path=os.path.join(AILA_STATUTES_DATA_ROOT, "corpus.jsonl"),
+        queries_path=os.path.join(AILA_STATUTES_DATA_ROOT, "queries.jsonl"),
+        qrels_path=os.path.join(AILA_STATUTES_DATA_ROOT, "qrels/test.jsonl"),
+        min_len=200,
+        text_key="text",
+        title_key="title",
+        id_key="_id",
+        query_id_key="_id",
+        query_text_key="text",
+        qrels_qid_key="query-id",
+        qrels_pid_key="corpus-id",
+        qrels_score_key="score",
     ),
 }
 
