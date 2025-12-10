@@ -174,6 +174,65 @@ def load_generated_corpus(corpus_path: str, num_samples: int = -1) -> List[dict]
     return records
 
 
+def load_examples_pool(examples_path: str, sample_size: int = 30) -> Optional[List[dict]]:
+    """加载 few-shot 示例池，自动兼容 JSON / JSONL 等格式。
+
+    输入：
+    - examples_path：示例文件路径，既可能是一个 JSON list，也可能是逐行 JSON（JSONL）。
+    - sample_size：最多抽取多少个示例进入内存，默认 30。
+
+    输出：若读取成功返回字典列表，否则返回 None。
+    主要逻辑：
+    1) 优先尝试 `json.load`（支持单个 list / dict）；
+    2) 如果解析失败，再按逐行 JSON 解析并忽略空行；
+    3) 最后对有效列表进行随机抽样，保证与原逻辑一致。
+    """
+
+    if not os.path.exists(examples_path):
+        print(f"[WARN] examples_path not found: {examples_path}")
+        return None
+
+    def _normalize_to_list(obj):
+        # 将单个对象或字典包装成列表，保持后续处理一致
+        if obj is None:
+            return []
+        if isinstance(obj, list):
+            return obj
+        return [obj]
+
+    examples: List[dict] = []
+
+    try:
+        # 先尝试常规 JSON 读取
+        with open(examples_path, 'r', encoding='utf-8') as f:
+            raw = json.load(f)
+            examples = _normalize_to_list(raw)
+    except json.JSONDecodeError:
+        # 如果文件包含多个 JSON 对象（如 JSONL），逐行解析
+        with open(examples_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    examples.append(obj)
+                except json.JSONDecodeError:
+                    print(f"[WARN] Skip invalid example line: {line[:50]}...")
+    except Exception as e:
+        print(f"[WARN] Failed to load examples from {examples_path}: {e}")
+        return None
+
+    if len(examples) == 0:
+        print(f"[WARN] No valid examples parsed from {examples_path}")
+        return None
+
+    if len(examples) > sample_size:
+        examples = random.sample(examples, sample_size)
+
+    return examples
+
+
 def gen_triplets(
     model: str,
     model_type: str,
@@ -359,16 +418,7 @@ def main(args):
     num_examples = args.num_examples
     if examples_dir is not None:
         examples_path = os.path.join(examples_dir, task_type, f"{language}_sample_examples.json")
-        try:
-            with open(examples_path, 'r', encoding='utf-8') as f:
-                examples_pool = json.load(f)
-                examples_pool = random.sample(
-                    examples_pool,
-                    min(30, len(examples_pool))
-                )  # sample 30 examples for few-shot generation
-        except Exception as e:
-            print(f'Error for loading examples from {examples_path}: {e}')
-            examples_pool = None
+        examples_pool = load_examples_pool(examples_path, sample_size=30)
     else:
         examples_pool = None
 
