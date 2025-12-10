@@ -7,17 +7,30 @@ from hashlib import md5
 import multiprocessing as mp
 from typing import List, Optional
 
+from datasets import Dataset
+
 from constant import TaskType, Language
-from corpus_generator import CorpusGenerator
 from triplet_generator import TripletGenerator
 from task_configs import default_generated_corpus_path, get_task_config
 
 
 def compute_md5(text: str):
+    """计算文本的 MD5 值，用于简单去重。
+
+    输入：纯文本字符串；输出：对应的 32 位十六进制 MD5 摘要。
+    """
+
     return md5(text.encode()).hexdigest()
 
 
 def get_args():
+    """解析命令行参数。
+
+    - 输入：命令行传入的各项开关。
+    - 输出：`argparse.Namespace`，后续直接在 `main` 中使用。
+    主要逻辑：定义任务、模型、进程数、数据路径等参数，并提供默认值。
+    """
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--task_type',
@@ -122,6 +135,104 @@ def get_args():
     return args
 
 
+def load_generated_corpus(corpus_path: str, num_samples: int = -1) -> List[dict]:
+    """直接读取合成语料文件，逐条返回用于生成查询的样本。
+
+    输入：
+    - corpus_path：`run_corpus_generation.py` 产出的合成语料路径，支持 `.jsonl` 或 Arrow。
+    - num_samples：若 >0，则按原始顺序截取前 N 条；-1 代表使用全部。
+
+    输出：包含 text 等字段的字典列表；只要 `text` 不为空就会被保留，不再做 qrels 过滤。
+    主要逻辑：根据扩展名选择读取方式，保持语料顺序，确保生成阶段“一条语料一条生成”。
+    """
+
+    if not os.path.exists(corpus_path):
+        raise FileNotFoundError(f"Corpus path does not exist: {corpus_path}")
+
+    records: List[dict] = []
+
+    if corpus_path.endswith(".jsonl"):
+        with open(corpus_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                text = data.get("text") or data.get("desc")
+                if text:
+                    records.append(data)
+    else:
+        ds = Dataset.from_file(corpus_path)
+        for item in ds:
+            text = item.get("text") or item.get("desc")
+            if text:
+                records.append(dict(item))
+
+    if num_samples > 0:
+        records = records[:num_samples]
+
+    return records
+
+
+def load_examples_pool(examples_path: str, sample_size: int = 30) -> Optional[List[dict]]:
+    """加载 few-shot 示例池，自动兼容 JSON / JSONL 等格式。
+
+    输入：
+    - examples_path：示例文件路径，既可能是一个 JSON list，也可能是逐行 JSON（JSONL）。
+    - sample_size：最多抽取多少个示例进入内存，默认 30。
+
+    输出：若读取成功返回字典列表，否则返回 None。
+    主要逻辑：
+    1) 优先尝试 `json.load`（支持单个 list / dict）；
+    2) 如果解析失败，再按逐行 JSON 解析并忽略空行；
+    3) 最后对有效列表进行随机抽样，保证与原逻辑一致。
+    """
+
+    if not os.path.exists(examples_path):
+        print(f"[WARN] examples_path not found: {examples_path}")
+        return None
+
+    def _normalize_to_list(obj):
+        # 将单个对象或字典包装成列表，保持后续处理一致
+        if obj is None:
+            return []
+        if isinstance(obj, list):
+            return obj
+        return [obj]
+
+    examples: List[dict] = []
+
+    try:
+        # 先尝试常规 JSON 读取
+        with open(examples_path, 'r', encoding='utf-8') as f:
+            raw = json.load(f)
+            examples = _normalize_to_list(raw)
+    except json.JSONDecodeError:
+        # 如果文件包含多个 JSON 对象（如 JSONL），逐行解析
+        with open(examples_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    examples.append(obj)
+                except json.JSONDecodeError:
+                    print(f"[WARN] Skip invalid example line: {line[:50]}...")
+    except Exception as e:
+        print(f"[WARN] Failed to load examples from {examples_path}: {e}")
+        return None
+
+    if len(examples) == 0:
+        print(f"[WARN] No valid examples parsed from {examples_path}")
+        return None
+
+    if len(examples) > sample_size:
+        examples = random.sample(examples, sample_size)
+
+    return examples
+
+
 def gen_triplets(
     model: str,
     model_type: str,
@@ -137,6 +248,12 @@ def gen_triplets(
     num_variants_per_doc: int = 1,
     narrative_focus: Optional[str] = None,
 ):
+    """调用 `TripletGenerator` 生成查询-正例对。
+
+    输入：模型相关配置、待生成的正例列表（每条含 text）、任务与语言信息、few-shot 示例池等。
+    输出：包含 query/pos 的三元组列表；内部会做多线程并行，遵循传入的变体数和叙事焦点。
+    """
+
     triplet_generator = TripletGenerator(model, model_type, port, cache_dir=gen_cache_dir)
     triplets = triplet_generator.run(
         positives=positives,
@@ -157,6 +274,8 @@ def get_save_path(
     task_type: str,
     language: str,
 ):
+    """返回单轮模式下的输出路径并确保目录存在。"""
+
     save_dir = os.path.join(save_dir, language, task_type)
     file_name = f"{language}-triplets.jsonl"
     save_path = os.path.join(save_dir, file_name)
@@ -170,6 +289,8 @@ def save_triplets(
     task_type: str,
     language: str,
 ):
+    """将生成的三元组落盘；自动与旧文件去重并追加。"""
+
     if len(triplets) == 0:
         print(f"No triplets to save: {task_type} | {language}")
         return
@@ -241,6 +362,8 @@ def save_triplets_for_round(
 
 
 def main(args):
+    """入口函数：按指定语料逐条生成查询并写入输出文件。"""
+
     model = args.model
     model_type = args.model_type
     port = args.port
@@ -255,6 +378,7 @@ def main(args):
     cache_dir = args.cache_dir
     num_processes = min(args.num_processes, int(mp.cpu_count() * 0.8))
     overwrite = args.overwrite
+    gen_cache_root = cache_dir or save_dir
 
     # Always default to the synthesized corpus produced by run_corpus_generation.
     if args.corpus_path:
@@ -290,30 +414,19 @@ def main(args):
         if num_samples <= 0:
             print("[INFO] num_samples <= 0 in multi-round mode: use all positives.")
 
-    corpus_generator = CorpusGenerator(cache_dir)
-
     examples_dir = args.examples_dir or get_task_config(task_type).examples_dir
     num_examples = args.num_examples
     if examples_dir is not None:
         examples_path = os.path.join(examples_dir, task_type, f"{language}_sample_examples.json")
-        try:
-            with open(examples_path, 'r', encoding='utf-8') as f:
-                examples_pool = json.load(f)
-                examples_pool = random.sample(
-                    examples_pool,
-                    min(30, len(examples_pool))
-                )  # sample 30 examples for few-shot generation
-        except Exception as e:
-            print(f'Error for loading examples from {examples_path}: {e}')
-            examples_pool = None
+        examples_pool = load_examples_pool(examples_path, sample_size=30)
     else:
         examples_pool = None
 
-    positives = corpus_generator.run(
-        task_type=task_type,
-        language=language,
+    if args.qrels_path:
+        print("[INFO] 当前生成逻辑直接遍历合成语料，不再使用 qrels 做过滤，忽略传入的 qrels_path。")
+
+    positives = load_generated_corpus(
         corpus_path=corpus_path,
-        qrels_path=args.qrels_path,
         num_samples=num_samples,
     )
     print(f"[INFO] Num positives used for generation: {len(positives)}")
@@ -333,7 +446,7 @@ def main(args):
             examples_pool=examples_pool,
             num_examples=num_examples,
             thread_count=num_processes,
-            gen_cache_dir=os.path.join(save_dir, language, task_type, "gen_cache_dir"),
+            gen_cache_dir=os.path.join(gen_cache_root, language, task_type, "gen_cache_dir"),
             num_variants_per_doc=getattr(args, "num_variants_per_doc", 1),
         )
         save_triplets(
@@ -384,7 +497,7 @@ def main(args):
             narrative_focus = focus_sequence[(round_idx - 1) % len(focus_sequence)]
 
             round_cache_dir = os.path.join(
-                save_dir, language, task_type, f"gen_cache_dir_round{round_idx}"
+                gen_cache_root, language, task_type, f"gen_cache_dir_round{round_idx}"
             )
 
             triplets = gen_triplets(
