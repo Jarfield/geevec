@@ -227,7 +227,7 @@ def load_examples_pool(examples_path: str, sample_size: int = 30) -> Optional[Li
     def _normalize_example(example: dict) -> Optional[dict]:
         """把不同字段名的示例映射成统一的 input/output。
 
-        - input 备选字段：`input`、`context`、`content`、`text`、`doc`、`document`。
+        - input 备选字段：`input`、`context`、`content`、`text`、`doc`、`document`、`pos`、`positive`、`passage`。
         - output 备选字段：`output`、`target`、`query`、`question`、`label`。
 
         缺失任意一侧都会返回 None 并跳过。
@@ -240,6 +240,9 @@ def load_examples_pool(examples_path: str, sample_size: int = 30) -> Optional[Li
             "text",
             "doc",
             "document",
+            "pos",
+            "positive",
+            "passage",
         ]
         output_candidates = [
             "output",
@@ -257,6 +260,13 @@ def load_examples_pool(examples_path: str, sample_size: int = 30) -> Optional[Li
 
         normalized_input = _pick_first(input_candidates)
         normalized_output = _pick_first(output_candidates)
+
+        # 某些示例的 `pos` 可能是列表（例如多个正样本），这里兼容并拼成单一字符串
+        if isinstance(normalized_input, list):
+            normalized_input = "\n".join(map(str, normalized_input))
+
+        if isinstance(normalized_output, list):
+            normalized_output = "\n".join(map(str, normalized_output))
 
         if normalized_input is None or normalized_output is None:
             print(

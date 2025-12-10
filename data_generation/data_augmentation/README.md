@@ -9,7 +9,7 @@
 
 ## 主要函数职责
 - **`load_generated_corpus`（code/run_generation.py）**：读取 `run_corpus_generation.py` 产出的合成语料（`.jsonl` 或 Arrow`），只要含有 `text/desc` 字段即保留，可选 `num_samples` 截断。
-- **`load_examples_pool`（code/run_generation.py）**：加载 few-shot 示例，兼容 JSON / JSONL，并自动将不同字段名映射成 `{input, output}` 结构，缺失字段会被跳过。
+- **`load_examples_pool`（code/run_generation.py）**：加载 few-shot 示例，兼容 JSON / JSONL，并自动将不同字段名映射成 `{input, output}` 结构（支持 `input/context/content/text/doc/document/pos/positive/passage` 与 `output/target/query/question/label`），缺失字段会被跳过。
 - **`gen_triplets`（code/run_generation.py` + `triplet_generator.py`）**：包装 `TripletGenerator.run`，按进程数并行生成查询与正例。
 - **`save_triplets` / `save_triplets_for_round`（code/run_generation.py）**：单轮 / 多轮模式下落盘三元组，自动创建目录并按语言、任务组织文件名。
 - **`TripletGenerator.generate_triplets`（code/triplet_generator.py）**：对单条文档构造 Prompt 并调用 `LLM.chat`；可选 few-shot 示例与叙事焦点（`narrative_focus`）。
@@ -82,7 +82,7 @@
      --num_examples 10 \
      --model Qwen2-5-72B-Instruct --model_type open-source --port 8000
    ```
-   - 若示例文件是 JSONL 或字段名为 `context/query`，无需修改格式，脚本会自动映射。
+   - 若示例文件是 JSONL 或字段名为 `context/query/pos` 等，均无需修改格式，脚本会自动映射并拼接列表字段。
    - 如需复用现有生成缓存，可设置 `--cache_dir`；多轮生成时会自动分轮使用不同缓存目录。
 
 ## 详细说明
@@ -95,7 +95,7 @@
   - 输出：查询-正例三元组 JSONL，按任务与语言分目录存储；多轮模式会生成 `_round{idx}` 后缀文件。
 
 ### 常见排查
-- **示例字段不匹配导致报错**：`load_examples_pool` 会尝试从 `input/context/content/text/doc/document` 里取输入，`output/target/query/question/label` 里取输出；缺失会打印警告并跳过，不再因 KeyError 终止生成。
+- **示例字段不匹配导致报错**：`load_examples_pool` 会尝试从 `input/context/content/text/doc/document/pos/positive/passage` 里取输入，`output/target/query/question/label` 里取输出；若字段为列表会自动拼接，缺失会打印警告并跳过，不再因 KeyError 终止生成。
 - **没有生成任何三元组**：确认 `generated_corpus/<lang>_synth_corpus.jsonl` 存在且包含 `text/desc` 字段；`--num_samples` 不要设置为 0；确保 LLM 服务可用并端口正确。
 - **希望并发加速**：`--num_processes` 控制线程池大小，通常设置为 CPU 核心数的 70%-80% 即可。
 
