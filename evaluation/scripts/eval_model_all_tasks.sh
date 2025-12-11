@@ -17,8 +17,8 @@ tasks=(
   # "AILAStatutes"
   # "ArguAna"
   # "BelebeleRetrieval"
-    "CovidRetrieval"
-  # "SCIDOCS"
+  # "CovidRetrieval"
+   "SCIDOCS"
   # "SpartQA"
   # "TRECCOVID"
   # "WinoGrande"
@@ -26,7 +26,7 @@ tasks=(
   # "TwitterHjerneRetrieval"
 )
 
-model_path="/data/share/project/psjin/model/geevec-qwen3-8b-v4/CovidRetrieval/merged_model"
+model_path="/data/share/project/psjin/model/geevec-check/scidocs/merged_model"
 
 # 源文件路径列表
 required_files=(
@@ -64,7 +64,7 @@ copy_required_files() {
 copy_required_files
 
 for task in "${tasks[@]}"; do
-    out_dir="$results_output_folder/geevec-qwen3-8b-v4/$task"
+    out_dir="$results_output_folder/geevec-check/$task"
     mkdir -p "$out_dir"
     cmd="CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python main.py \
         --benchmark_name \"$task\" \
@@ -83,4 +83,4 @@ for task in "${tasks[@]}"; do
 done
 
 python "$eval_root/code/evaluation/code/summary.py" \
-    "$results_output_folder/geevec-qwen3-8b-v4" \
+    "$results_output_folder/geevec-check" \

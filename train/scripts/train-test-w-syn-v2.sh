@@ -48,13 +48,13 @@ synthetic_train_data="\
     /data/share/project/psjin/data/generated_data/scidocs/generation_results/hn_mine_data/en/scidocs \
     "
 train_data="\
-    /data/share/project/psjin/data/exported_original/scidocs/en/scidocs/hn_mine_data
+    /data/share/project/psjin/data/exported_original/scidocs/en/scidocs/hn_mine_data_new
 "
     
 # set large epochs and small batch size for testing
 num_train_epochs=5
 per_device_train_batch_size=32
-
+sub_batch_size=16
 num_gpus=8
 task_type="scidocs"
 
@@ -91,7 +91,7 @@ training_args="\
     --bf16 True \
     --num_train_epochs $num_train_epochs \
     --per_device_train_batch_size $per_device_train_batch_size \
-    --sub_batch_size 16 \
+    --sub_batch_size $sub_batch_size \
     --dataloader_drop_last True \
     --warmup_ratio 0.1 \
     --gradient_checkpointing \
