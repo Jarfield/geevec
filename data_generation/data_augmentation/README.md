@@ -8,6 +8,9 @@
 下文按函数、脚本参数与使用示例展开说明，便于快速排查和二次开发。
 
 ## 主要函数职责
+- **`get_pair_scoring_prompt`（code/constant.py）**：为“查询-文档”相关性打分生成 LLM 提示词，输出固定的 `<score>1-5</score>` 标签。
+- **`QueryDocPairScorer.score_pair`（code/query_doc_pair_scorer.py）**：调用 LLM 对单个 query-doc 生成分数，可选基于 MD5 的缓存。
+- **`QueryDocPairScorer.score_item` / `run`**：批量遍历 mined 数据（`query` + `pos/neg/topk`），根据阈值切分正例 / 难负例并保存 `score_details`。
 - **`load_generated_corpus`（code/run_generation.py）**：读取 `run_corpus_generation.py` 产出的合成语料（`.jsonl` 或 Arrow`），只要含有 `text/desc` 字段即保留，可选 `num_samples` 截断。
 - **`load_examples_pool`（code/run_generation.py）**：加载 few-shot 示例，兼容 JSON / JSONL，并自动将不同字段名映射成 `{input, output}` 结构（支持 `input/context/content/text/doc/document/pos/positive/passage` 与 `output/target/query/question/label`），缺失字段会被跳过。
 - **`gen_triplets`（code/run_generation.py` + `triplet_generator.py`）**：包装 `TripletGenerator.run`，按进程数并行生成查询与正例。
@@ -48,6 +51,16 @@
 - `--num_variants_per_doc`：单轮模式下每条文档生成多少条查询。
 - `--num_rounds`：多轮生成次数；>1 时每轮输出单独文件，并可按任务自动轮换 `narrative_focus`。
 
+### `code/run_pair_scoring.py`
+基于 hn_mine / 检索候选的 query-doc 对进行 LLM 打分，便于过滤弱负样本：
+- `--task_type` / `--language`：任务与语言枚举。
+- `--input_path`：输入 JSONL，需包含 `query`，候选文档可以放在 `pos`/`neg`/`topk` 中。
+- `--output_path`：打分后输出路径（会更新 `pos`/`neg`，并在 `score_details` 中保留每个文档的原始分数）。
+- `--pos_threshold` / `--neg_threshold`：阈值，默认 ≥4 记为正例，≤2 记为难负。
+- `--num_processes`：并行线程数；`--num_samples` 可截断用于快速试跑。
+- `--cache_dir`：query+doc 级别的缓存目录，避免重复打分。
+- `--overwrite`：目标文件存在时是否覆盖。
+
 ### `script/run_corpus.sh`
 通过环境变量封装 `run_corpus_generation.py`，常用变量：
 - `TASK_TYPE`、`LANGUAGE`、`NUM_VARIANTS_PER_SEED`、`NUM_THREADS`、`NUM_SEED_SAMPLES`。
@@ -60,6 +73,15 @@
 - `NUM_EXAMPLES`、`NUM_SAMPLES`、`NUM_VARIANTS_PER_DOC`、`NUM_ROUNDS`、`NUM_PROCESSES`。
 - `CACHE_DIR`、`EXAMPLES_DIR`、`CORPUS_PATH`。
 - `MODEL_NAME`、`MODEL_TYPE`、`PORT`、`MODE`（影响 `save_dir` 子目录）、`OVERWRITE`。
+
+### `script/run_pair_scoring.sh`
+封装 `run_pair_scoring.py`：
+- `TASK_TYPE` / `LANGUAGE`：决定提示模板与输出目录后缀。
+- `INPUT_PATH` / `OUTPUT_PATH`：输入/输出 JSONL 路径，默认沿用 `run_hn_mine.sh` 的输出目录。
+- `POS_THRESHOLD` / `NEG_THRESHOLD`：打分阈值，覆盖 `run_pair_scoring.py` 的默认值。
+- `MODEL_NAME` / `MODEL_TYPE` / `PORT` / `NUM_PROCESSES`：LLM 与并行配置。
+- `CACHE_DIR`：启用则自动复用 query-doc 级别缓存。
+- `OVERWRITE`：是否覆盖已有的输出文件。
 
 ### `code/export_original_pairs.py` & `script/run_export_original.sh`
 将**原始元数据（非合成语料）**中 `score >= 1` 的 query-doc 正例抽取成 `{prompt, query, pos, neg}` JSONL，方便直接用测试集格式做训练对比。
@@ -116,6 +138,17 @@ QRELS_PATH="/path/to/qrels.arrow" QUERIES_PATH="/path/to/queries.arrow" \
    - 若示例文件是 JSONL 或字段名为 `context/query/pos` 等，均无需修改格式，脚本会自动映射并拼接列表字段。
    - 如需复用现有生成缓存，可设置 `--cache_dir`；多轮生成时会自动分轮使用不同缓存目录。
 
+3. **对 hn_mine 候选进行 query-doc 打分，筛难负样本**
+   ```bash
+   cd data_generation/data_augmentation
+   TASK_TYPE="covidretrieval" LANGUAGE="zh" \
+   INPUT_PATH="/path/to/hn_mine.jsonl" OUTPUT_PATH="/path/to/hn_mine_scored.jsonl" \
+   MODEL_NAME="Qwen2-5-72B-Instruct" PORT=8000 NUM_PROCESSES=8 \
+   ./script/run_pair_scoring.sh
+   ```
+   - 默认 ≥4 视为正例，≤2 视为难负；可通过 `POS_THRESHOLD`、`NEG_THRESHOLD` 覆盖。
+   - 若提供 `CACHE_DIR`，会按 query+doc MD5 缓存打分，避免重复请求 LLM。
+
 ## 详细说明
 ### 输入输出关系
 - **run_corpus_generation.py**：
@@ -124,6 +157,9 @@ QRELS_PATH="/path/to/qrels.arrow" QUERIES_PATH="/path/to/queries.arrow" \
 - **run_generation.py**：
   - 输入：合成语料、可选 few-shot 示例、模型信息、生成参数。
   - 输出：查询-正例三元组 JSONL，按任务与语言分目录存储；多轮模式会生成 `_round{idx}` 后缀文件。
+- **run_pair_scoring.py**：
+  - 输入：含 `query` 及候选文档字段（`pos/neg/topk` 任一即可）的 JSONL，通常来自 `run_hn_mine.sh` 输出。
+  - 输出：在 `score_details` 中补充每个文档的相关性分数，并依据阈值重写 `pos` / `neg`，便于后续筛选或训练。
 
 ### 常见排查
 - **示例字段不匹配导致报错**：`load_examples_pool` 会尝试从 `input/context/content/text/doc/document/pos/positive/passage` 里取输入，`output/target/query/question/label` 里取输出；若字段为列表会自动拼接，缺失会打印警告并跳过，不再因 KeyError 终止生成。
