@@ -179,6 +179,51 @@ Here are a few examples for your reference:
 
     return gen_prompt
 
+
+def get_pair_scoring_prompt(
+    task: Task,
+    query: str,
+    doc: str,
+) -> str:
+    """构造 Query-Document 打分的提示词，返回 <score>1-5</score>。"""
+    relevance_scale = (
+        "- 5 (Highly Relevant): The document is directly and fully responsive to the query, providing comprehensive, accurate, and specific information that completely addresses all aspects of the query.\n"
+        "- 4 (Relevant): The document is largely relevant and provides most of the information needed, but may have minor omissions, slight inaccuracies, or not be perfectly aligned with the query’s intent.\n"
+        "- 3 (Moderately Relevant): The document has some relevance and offers partial information, but it may be incomplete, vague, or include some irrelevant content.\n"
+        "- 2 (Slightly Relevant): The document has minimal relevance, with only a small portion tangentially related to the query.\n"
+        "- 1 (Irrelevant): The document is completely unrelated to the query and provides no useful information."
+    )
+
+    mission = (
+        "Now given a query and a document in this retrieval task, your mission is to:\n"
+        "1. Analyze the query and document to understand the information need.\n"
+        "2. Judge the relevance between them using the following 1-5 scoring guide.\n"
+        "3. Output the final score strictly between <score> and </score> tags with no extra text inside the tags."
+    )
+
+    prompt = f"""\
+Task: {task.task_instruction}
+
+{mission}
+Scoring Guide:
+{relevance_scale}
+
+Query:
+[Begin of Query]
+{query}
+[End of Query]
+
+Document:
+[Begin of Document]
+{doc}
+[End of Document]
+
+Final score (only the number inside the tags):
+<score>
+</score>
+"""
+    return prompt
+
 def get_doc_synthesis_prompt(
     task: Task,
     seed_text: str,
