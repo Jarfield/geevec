@@ -43,15 +43,12 @@ synthetic_train_data="\
     /share/project/psjin/data/generated_data/covidretrieval/generation_results/hn_mine_data/zh/covidretrieval\
     /share/project/psjin/data/generated_data/scidocs/generation_results/hn_mine_data/en/scidocs \
     "
-train_data="\
-    $en_train_data \
-    $zh_train_data \
-    $multilingual_train_data \
-    $synthetic_train_data \
+train_data="
+    /data/share/project/psjin/data/exported_original/covidretrieval/zh/covidretrieval/hn_mine_data
 "
     
 # set large epochs and small batch size for testing
-num_train_epochs=1
+num_train_epochs=5
 per_device_train_batch_size=48
 
 num_gpus=8

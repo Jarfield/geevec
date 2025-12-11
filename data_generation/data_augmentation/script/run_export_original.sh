@@ -4,10 +4,10 @@ set -euo pipefail
 # 将原始元数据（corpus + queries + qrels）转换为训练三元组格式。
 # 数据路径与字段名默认从 code/task_configs.py 读取，通常只需设置 TASK_TYPE/LANGUAGE。
 
-TASK_TYPE=${TASK_TYPE:?请设置 TASK_TYPE，例如 covidretrieval}
+TASK_TYPE=${TASK_TYPE:-scidocs}
 LANGUAGE=${LANGUAGE:-en}
 
-SAVE_ROOT=${SAVE_ROOT:-}
+SAVE_ROOT=${SAVE_ROOT:-/data/share/project/psjin/data/exported_original/${TASK_TYPE}/${LANGUAGE}}
 CORPUS_PATH=${CORPUS_PATH:-}
 QUERIES_PATH=${QUERIES_PATH:-}
 QRELS_PATH=${QRELS_PATH:-}
@@ -26,10 +26,9 @@ POSITIVE_SCORE=${POSITIVE_SCORE:-1}
 MIN_LEN=${MIN_LEN:-}
 MAX_QUERIES=${MAX_QUERIES:--1}
 
-PROMPT=${PROMPT:-}
-OVERWRITE=${OVERWRITE:-0}
+OVERWRITE=${OVERWRITE:-1}
 
-CMD=(python code/export_original_pairs.py --task_type "${TASK_TYPE}" --language "${LANGUAGE}" --positive_score "${POSITIVE_SCORE}" --max_queries "${MAX_QUERIES}" --prompt "${PROMPT}")
+CMD=(python /data/share/project/psjin/code/data_generation/data_augmentation/code/export_original_pairs.py --task_type "${TASK_TYPE}" --language "${LANGUAGE}" --positive_score "${POSITIVE_SCORE}" --max_queries "${MAX_QUERIES}")
 
 [[ -n "${SAVE_ROOT}" ]] && CMD+=(--save_root "${SAVE_ROOT}")
 [[ -n "${CORPUS_PATH}" ]] && CMD+=(--corpus_path "${CORPUS_PATH}")

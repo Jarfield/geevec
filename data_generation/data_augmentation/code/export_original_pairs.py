@@ -15,7 +15,7 @@ from typing import Dict, Iterable, List, Optional, Set
 from datasets import Dataset, load_dataset
 from tqdm import tqdm
 
-from constant import Language, TaskType
+from constant import Language, TaskType, get_task
 from task_configs import DEFAULT_ORIGINAL_ROOT, TaskDatasetConfig, get_task_config
 
 
@@ -108,7 +108,6 @@ def parse_args() -> argparse.Namespace:
         help="完整输出路径；若提供则忽略 save_root/language 组合文件名",
     )
     parser.add_argument("--overwrite", action="store_true", help="若文件存在是否覆盖")
-    parser.add_argument("--prompt", default="", help="输出中的 prompt 字段值，默认空字符串")
 
     return parser.parse_args()
 
@@ -142,6 +141,12 @@ def main():
     qrels_pid_key = args.qrels_pid_key or cfg.qrels_pid_key
     qrels_score_key = args.qrels_score_key or cfg.qrels_score_key
     min_len = args.min_len if args.min_len is not None else cfg.min_len
+    
+    # 💡 1. 获取 Task 对象和 prompt (task_instruction)
+    task_obj = get_task(args.task_type, args.language)
+    task_instruction = task_obj.task_instruction
+    if task_instruction is None:
+        raise ValueError(f"TaskType.{args.task_type} 在 constant 中未定义任务说明 (value)")
 
     # ---------- 加载数据 ----------
     corpus_ds = _load_dataset(corpus_path)
@@ -183,9 +188,10 @@ def main():
         pos_texts = [corpus_lookup[pid] for pid in doc_ids if pid in corpus_lookup]
         if not pos_texts:
             continue
+        # 💡 2. 将 task_instruction 赋值给 "prompt" 字段
         results.append(
             {
-                "prompt": args.prompt,
+                "prompt": task_instruction, 
                 "query": query_text,
                 "pos": sorted(set(pos_texts)),
                 "neg": [],

@@ -48,23 +48,20 @@ synthetic_train_data="\
     /data/share/project/psjin/data/generated_data/scidocs/generation_results/hn_mine_data/en/scidocs \
     "
 train_data="\
-    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/en/ArguAna\
-    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/en/MSMARCO\
-    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/en/SCIDOCS\
-    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/zh/mMARCO_zh\
-    $synthetic_train_data \
+    /data/share/project/psjin/data/exported_original/scidocs/en/scidocs/hn_mine_data
 "
     
 # set large epochs and small batch size for testing
-num_train_epochs=1
+num_train_epochs=5
 per_device_train_batch_size=32
 
 num_gpus=8
+task_type="scidocs"
 
 export HF_HUB_CACHE="/data/share/project/shared_datasets/.cache"
 
 model_args="\
-    --model_name_or_path  /data/share/project/shared_models/Qwen3-8B-auto-eos\
+    --model_name_or_path  /data/share/project/shared_models/Qwen3-Embedding-8B\
     --cache_dir $HF_HUB_CACHE \
     --use_lora True \
     --lora_rank 32 \
@@ -88,10 +85,10 @@ data_args="\
 "
 
 training_args="\
-    --output_dir /data/share/project/psjin/model/geevec-qwen3-8b-v2-test-w-syn \
-    --resume_from_checkpoint /data/share/project/psjin/model/geevec-qwen3-8b-v2-test-w-syn/checkpoint-1480 \
+    --output_dir /data/share/project/psjin/model/geevec-check/$task_type \
     --learning_rate 1e-4 \
-    --fp16 \
+    --fp16 False \
+    --bf16 True \
     --num_train_epochs $num_train_epochs \
     --per_device_train_batch_size $per_device_train_batch_size \
     --sub_batch_size 16 \

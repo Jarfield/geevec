@@ -56,24 +56,13 @@ DEFAULT_GENERATED_ROOT = os.environ.get(
 )
 DEFAULT_ORIGINAL_ROOT = os.environ.get(
     "DATA_AUG_ORIGINAL_ROOT",
-    os.path.join(os.path.dirname(DEFAULT_GENERATED_ROOT.rstrip(os.sep)), "original_data"),
+    "/data/share/project/psjin/data/exported_original",
 )
 
 ARGUANA_DATA_ROOT = os.path.join(
     DEFAULT_DATA_ROOT,
     "shared_models/datasets--mteb--arguana/snapshots/c22ab2a51041ffd869aaddef7af8d8215647e41a",
 )
-
-SCIDOCS_DATA_ROOT = os.path.join(
-    DEFAULT_DATA_ROOT,
-    "mteb/datasets--mteb--scidocs/snapshots/f8c2fcf00f625baaa80f62ec5bd9e1fff3b8ae88",
-)
-
-AILA_STATUTES_DATA_ROOT = os.path.join(
-    DEFAULT_DATA_ROOT,
-    "shared_models/datasets--mteb--AILA_statutes/snapshots/ac23c06b6894334dd025491c6abc96ef516aad2b",
-)
-
 
 def default_generated_corpus_path(task_type: str, language: str) -> str:
     """Return the expected path for the synthesized corpus of a task.
@@ -117,9 +106,18 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
         examples_dir=os.path.join(DEFAULT_DATA_ROOT, "data_generation/examples"),
     ),
     "scidocs": TaskDatasetConfig(
-        corpus_path=os.path.join(SCIDOCS_DATA_ROOT, "corpus.jsonl"),
-        queries_path=os.path.join(SCIDOCS_DATA_ROOT, "queries.jsonl"),
-        qrels_path=os.path.join(SCIDOCS_DATA_ROOT, "qrels/test.jsonl"),
+        corpus_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "MMTEB/mteb___scidocs/corpus/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-corpus.arrow"
+        ),
+        queries_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "MMTEB/mteb___scidocs/queries/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-queries.arrow",
+        ),
+        qrels_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "MMTEB/mteb___scidocs/default/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-test.arrow",
+        ),
         min_len=200,
         text_key="text",
         title_key="title",
@@ -145,9 +143,18 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
         qrels_score_key="score",
     ),
     "ailastatutes": TaskDatasetConfig(
-        corpus_path=os.path.join(AILA_STATUTES_DATA_ROOT, "corpus.jsonl"),
-        queries_path=os.path.join(AILA_STATUTES_DATA_ROOT, "queries.jsonl"),
-        qrels_path=os.path.join(AILA_STATUTES_DATA_ROOT, "qrels/test.jsonl"),
+        corpus_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "MMTEB/mteb___aila_statutes/corpus/0.0.0/ac23c06b6894334dd025491c6abc96ef516aad2b/aila_statutes-corpus.arrow",
+        ),
+        queries_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "MMTEB/mteb___aila_statutes/queries/0.0.0/ac23c06b6894334dd025491c6abc96ef516aad2b/aila_statutes-queries.arrow",
+        ),
+        qrels_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "MMTEB/mteb___aila_statutes/default/0.0.0/ac23c06b6894334dd025491c6abc96ef516aad2b/aila_statutes-test.arrow",
+        ),
         min_len=200,
         text_key="text",
         title_key="title",

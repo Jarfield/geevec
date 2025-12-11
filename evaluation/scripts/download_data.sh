@@ -4,19 +4,17 @@
 export HF_ENDPOINT=https://hf-mirror.com
 
 # Cache directories
-export HF_HUB_CACHE="/share/project/shared_models"
-export HF_DATASETS_CACHE="/share/project/shared_datasets/MMTEB"
+export HF_HUB_CACHE="/data/share/project/shared_datasets"
+export HF_DATASETS_CACHE="/data/share/project/shared_datasets/MMTEB"
 
 # Activate environment
-source /root/miniconda3/bin/activate /share/project/psjin/envs/psjin_embedder
-
-eval_root="/share/project/shared_datasets/MMTEB"
+eval_root="/data/share/project/shared_datasets/MMTEB"
 results_output_folder="$eval_root/results_output_folder"
-model_path="/share/project/shared_models/Qwen3-Embedding-0.6B"
+model_path="/data/share/project/shared_models/Qwen3-Embedding-0.6B"
 
-# Download only the single task: CovidRetrieval
-cmd="python /share/project/psjin/evaluation/mmteb/code/main.py \
-    --benchmark_name CovidRetrieval \
+# Download only the single task: SCIDOCS
+cmd="python /data/share/project/psjin/code/evaluation/code/main.py \
+    --benchmark_name SCIDOCS \
     --only_download_data True \
     --results_output_folder $results_output_folder \
     --model_name_or_path $model_path \
