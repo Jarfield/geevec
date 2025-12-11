@@ -14,11 +14,11 @@ results_output_folder="$eval_root/result/evaluation"
 cd "$eval_root/code/evaluation/code" || exit 1
 
 tasks=(
-  # "AILAStatutes"
+  "AILAStatutes"
   # "ArguAna"
   # "BelebeleRetrieval"
   # "CovidRetrieval"
-   "SCIDOCS"
+  # "SCIDOCS"
   # "SpartQA"
   # "TRECCOVID"
   # "WinoGrande"
@@ -26,7 +26,7 @@ tasks=(
   # "TwitterHjerneRetrieval"
 )
 
-model_path="/data/share/project/psjin/model/geevec-check/scidocs/merged_model"
+model_path="/data/share/project/psjin/model/geevec-check/ailastatutes/merged_model"
 
 # 源文件路径列表
 required_files=(
