@@ -5,7 +5,8 @@ export HF_ENDPOINT=https://hf-mirror.com
 export MTEB_CACHE="/data/share/project/shared_datasets/mteb"
 
 # set model cache dir
-export HF_HUB_CACHE="/data/share/project/shared_models"
+export HF_HUB_CACHE="/data/share/project/shared_models/.cache"
+export HF_DATASETS_CACHE="/data/share/project/shared_datasets/.cache"
 
 # activate environment
 eval_root="/data/share/project/psjin"
@@ -14,10 +15,10 @@ results_output_folder="$eval_root/result/evaluation"
 cd "$eval_root/code/evaluation/code" || exit 1
 
 tasks=(
-  "AILAStatutes"
+  # "AILAStatutes"
   # "ArguAna"
   # "BelebeleRetrieval"
-  # "CovidRetrieval"
+  "CovidRetrieval"
   # "SCIDOCS"
   # "SpartQA"
   # "TRECCOVID"
@@ -26,7 +27,7 @@ tasks=(
   # "TwitterHjerneRetrieval"
 )
 
-model_path="/data/share/project/psjin/model/geevec-check/ailastatutes/merged_model"
+model_path="/data/share/project/psjin/model/geevec-qwen3-8b-v4/CovidRetrieval/merged_model"
 
 # 源文件路径列表
 required_files=(
@@ -64,7 +65,7 @@ copy_required_files() {
 copy_required_files
 
 for task in "${tasks[@]}"; do
-    out_dir="$results_output_folder/geevec-check/$task"
+    out_dir="$results_output_folder/geevec-qwen3-8b-v4/$task"
     mkdir -p "$out_dir"
     cmd="CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python main.py \
         --benchmark_name \"$task\" \
@@ -83,4 +84,4 @@ for task in "${tasks[@]}"; do
 done
 
 python "$eval_root/code/evaluation/code/summary.py" \
-    "$results_output_folder/geevec-check" \
+    "$results_output_folder/geevec-qwen3-8b-v4" \
