@@ -1,12 +1,4 @@
 # SCIDOCS 专用增强流程
-
-本目录替换了旧版 `code_for_SCIDOCS`，提供两个阶段脚本：
-
-- **Stage A (`build_scirepeval_scidocs_like.py`)**：从 `allenai/scirepeval` 抽取 SCIDOCS-like citation triples，自动过滤 SciDOCS 评测分布并按 FOS/年份筛选。
-- **Stage B (`add_scincl_neighbors.py`)**：在 Stage A 产出的 JSONL 上追加 SciNCL 风格的邻域采样，自动补充额外正例与 hard negative。
-
-所有产物与 `data_augmentation` 的 JSONL 格式兼容，可直接喂给 `run_pair_scoring.py` 继续做 LLM 打分，或直接用于 embedding 训练。
-
 ## 目录结构
 - `build_scirepeval_scidocs_like.py`：Stage A 主脚本。
 - `add_scincl_neighbors.py`：Stage B 主脚本，带有 `encode_batch` 占位符，请替换为你的 embedding 模型。

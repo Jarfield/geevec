@@ -45,6 +45,13 @@ def parse_args() -> argparse.Namespace:
         default=32,
         help="Batch size for encoding documents into vectors",
     )
+    # 关键：过滤短文本，避免把 query 标题之类塞进索引（默认 200，和你的 Stage A MIN_TEXT_LEN 对齐）
+    parser.add_argument(
+        "--min_doc_len",
+        type=int,
+        default=200,
+        help="Only index documents with text length >= this value (filters out titles).",
+    )
     parser.add_argument(
         "--overwrite",
         action="store_true",
@@ -89,23 +96,52 @@ def _hash_text(text: str) -> str:
     return hashlib.md5(text.encode("utf-8")).hexdigest()
 
 
-def build_doc_pool(data: List[dict]) -> Tuple[Dict[str, str], Dict[str, int], Dict[int, str]]:
+def build_doc_pool(
+    data: List[dict],
+    *,
+    min_doc_len: int,
+) -> Tuple[Dict[str, str], Dict[str, int], Dict[int, str]]:
+    """
+    Build a global doc_id -> text mapping from all per-item doc_pool.
+
+    Fixes for Stage A changes:
+    - If the same doc_id appears multiple times (e.g., once as query title, once as abstract),
+      keep the LONGER text (abstract usually longer), avoiding title overriding abstract.
+    - Filter out short texts from the FAISS index to avoid indexing titles.
+    """
     doc_map: Dict[str, str] = {}
+
     for item in data:
-        pool = item.get("doc_pool", {})
+        pool = item.get("doc_pool", {}) or {}
         for doc_id, text in pool.items():
-            doc_map[doc_id] = text
-    # fallback to hashed text if doc_ids are missing
+            if doc_id is None or text is None:
+                continue
+            doc_id = str(doc_id)
+            text = str(text)
+            prev = doc_map.get(doc_id)
+            # keep longer one (prefer abstracts)
+            if prev is None or len(text) > len(prev):
+                doc_map[doc_id] = text
+
+    # fallback to hashed text if doc_ids are missing (rare for your pipeline)
     if not doc_map:
         for item in data:
-            for text in item.get("pos", []) + item.get("neg", []):
+            for text in (item.get("pos", []) or []) + (item.get("neg", []) or []):
+                if not text:
+                    continue
                 doc_id = _hash_text(text)
                 doc_map[doc_id] = text
+
+    # filter: only keep docs long enough for indexing
+    if min_doc_len > 0:
+        doc_map = {k: v for k, v in doc_map.items() if v and len(v) >= min_doc_len}
+
     id_to_idx: Dict[str, int] = {}
     idx_to_id: Dict[int, str] = {}
     for idx, doc_id in enumerate(sorted(doc_map.keys())):
         id_to_idx[doc_id] = idx
         idx_to_id[idx] = doc_id
+
     return doc_map, id_to_idx, idx_to_id
 
 
@@ -118,14 +154,13 @@ def build_index(doc_map: Dict[str, str], id_to_idx: Dict[str, int], batch_size: 
         batch = texts[start : start + batch_size]
         vecs = encode_batch(batch)
         embeddings.append(vecs)
+
     all_embeddings = np.concatenate(embeddings, axis=0)
     faiss.normalize_L2(all_embeddings)
 
     dim = all_embeddings.shape[1]
     index = faiss.index_factory(dim, index_factory)
-    if index.is_trained:
-        pass
-    else:
+    if not index.is_trained:
         index.train(all_embeddings)
     index.add(all_embeddings)
     return index, all_embeddings
@@ -134,16 +169,29 @@ def build_index(doc_map: Dict[str, str], id_to_idx: Dict[str, int], batch_size: 
 def _search_neighbors(index, all_embeddings, anchor_idx: int, k: int) -> List[int]:
     anchor = all_embeddings[anchor_idx : anchor_idx + 1]
     _, indices = index.search(anchor, k + 1)
-    # drop self at position 0
+    # drop self
     return [int(i) for i in indices[0] if i != anchor_idx]
 
 
-def _append_unique(target_list: List[str], candidates: Iterable[str]) -> None:
-    existing = set(target_list)
-    for cand in candidates:
-        if cand not in existing:
-            target_list.append(cand)
-            existing.add(cand)
+def _append_by_id(
+    *,
+    text_list: List[str],
+    id_list: List[str],
+    doc_pool: Dict[str, str],
+    candidates: List[str],
+    doc_map: Dict[str, str],
+) -> None:
+    existing = set(id_list)
+    for did in candidates:
+        if did in existing:
+            continue
+        txt = doc_map.get(did)
+        if not txt:
+            continue
+        id_list.append(did)
+        text_list.append(txt)
+        doc_pool[did] = txt
+        existing.add(did)
 
 
 def augment_sample(
@@ -158,42 +206,78 @@ def augment_sample(
     num_hard_negatives: int,
     search_depth: int,
 ) -> dict:
-    pos_ids = item.get("source_ids", {}).get("pos_ids") or []
-    neg_ids = set(item.get("source_ids", {}).get("neg_ids") or [])
-    query_id = item.get("source_ids", {}).get("query_id")
+    src = dict(item.get("source_ids", {}) or {})
+    pos_ids: List[str] = [str(x) for x in (src.get("pos_ids") or [])]
+    neg_ids: List[str] = [str(x) for x in (src.get("neg_ids") or [])]
+    query_id = src.get("query_id")
+    query_id = str(query_id) if query_id is not None else None
+
+    pos_id_set = set(pos_ids)
+    neg_id_set = set(neg_ids)
 
     pos_indices = [id_to_idx[pid] for pid in pos_ids if pid in id_to_idx]
     if not pos_indices:
         return item
 
-    pos_candidates: List[str] = []
-    neg_candidates: List[str] = []
+    # 采样：优先从正例的邻居里拿 num_pos_neighbors 个做 pos，再拿 num_hard_negatives 个做 hard neg
+    pos_neighbor_ids: List[str] = []
+    neg_neighbor_ids: List[str] = []
 
     for pos_idx in pos_indices:
         neighbor_indices = _search_neighbors(index, all_embeddings, pos_idx, search_depth)
-        for idx in neighbor_indices:
-            doc_id = idx_to_id[idx]
-            text = doc_map.get(doc_id)
-            if not text:
-                continue
-            if doc_id in pos_ids:
-                continue
+        for nb_idx in neighbor_indices:
+            doc_id = idx_to_id[nb_idx]
+
             if query_id and doc_id == query_id:
                 continue
-            if len(pos_candidates) < num_pos_neighbors:
-                pos_candidates.append(text)
-            elif len(neg_candidates) < num_hard_negatives and doc_id not in neg_ids:
-                neg_candidates.append(text)
-            if len(pos_candidates) >= num_pos_neighbors and len(neg_candidates) >= num_hard_negatives:
+            if doc_id in pos_id_set:
+                continue
+
+            # 不要把已有 neg 当成新 pos（避免标签冲突）
+            if doc_id in neg_id_set and len(pos_neighbor_ids) < num_pos_neighbors:
+                continue
+
+            if len(pos_neighbor_ids) < num_pos_neighbors:
+                pos_neighbor_ids.append(doc_id)
+                pos_id_set.add(doc_id)
+                continue
+
+            if len(neg_neighbor_ids) < num_hard_negatives:
+                if doc_id in neg_id_set:
+                    continue
+                neg_neighbor_ids.append(doc_id)
+                neg_id_set.add(doc_id)
+
+            if len(pos_neighbor_ids) >= num_pos_neighbors and len(neg_neighbor_ids) >= num_hard_negatives:
                 break
-        if len(pos_candidates) >= num_pos_neighbors and len(neg_candidates) >= num_hard_negatives:
+
+        if len(pos_neighbor_ids) >= num_pos_neighbors and len(neg_neighbor_ids) >= num_hard_negatives:
             break
 
     augmented = dict(item)
-    augmented["pos"] = list(item.get("pos", []))
-    augmented["neg"] = list(item.get("neg", []))
-    _append_unique(augmented["pos"], pos_candidates)
-    _append_unique(augmented["neg"], neg_candidates)
+    augmented["pos"] = list(item.get("pos", []) or [])
+    augmented["neg"] = list(item.get("neg", []) or [])
+    augmented["doc_pool"] = dict(item.get("doc_pool", {}) or {})
+    augmented["source_ids"] = src
+
+    # 同步更新：文本 + ids + doc_pool
+    _append_by_id(
+        text_list=augmented["pos"],
+        id_list=pos_ids,
+        doc_pool=augmented["doc_pool"],
+        candidates=pos_neighbor_ids,
+        doc_map=doc_map,
+    )
+    _append_by_id(
+        text_list=augmented["neg"],
+        id_list=neg_ids,
+        doc_pool=augmented["doc_pool"],
+        candidates=neg_neighbor_ids,
+        doc_map=doc_map,
+    )
+
+    augmented["source_ids"]["pos_ids"] = pos_ids
+    augmented["source_ids"]["neg_ids"] = neg_ids
     return augmented
 
 
@@ -205,10 +289,10 @@ def main() -> None:
         raise FileExistsError(f"Output already exists: {output_path}. Use --overwrite to replace.")
 
     data = load_jsonl(args.input_path)
-    doc_map, id_to_idx, idx_to_id = build_doc_pool(data)
+    doc_map, id_to_idx, idx_to_id = build_doc_pool(data, min_doc_len=args.min_doc_len)
 
     if not doc_map:
-        raise ValueError("No documents found in doc_pool/pos/neg fields.")
+        raise ValueError("No documents found for indexing (check doc_pool content or --min_doc_len).")
 
     index, all_embeddings = build_index(
         doc_map=doc_map,
