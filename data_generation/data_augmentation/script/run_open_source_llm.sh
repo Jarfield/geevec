@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export HF_HUB_CACHE="/data/share/project/shared_models/.cache"
+export HF_DATASETS_CACHE="/data/share/project/shared_datasets/.cache"
+export TORCHINDUCTOR_CACHE_DIR="/data/share/project/.cache/torch_compile"
+export TRITON_CACHE_DIR="/data/share/project/.cache/triton"
+
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "${REPO_ROOT}"  # keep relative paths stable
 
