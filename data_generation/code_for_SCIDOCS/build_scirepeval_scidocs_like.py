@@ -13,6 +13,8 @@ import argparse
 import json
 import os
 import random
+import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
@@ -187,6 +189,55 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="Optional: path to MTEB-SCIDOCS qrels dir; if set, all ids in qrels will be excluded to prevent leakage.",
     )
+    parser.add_argument(
+        "--topic_summary_model",
+        default="",
+        help=(
+            "Optional: model name served by a vLLM/OpenAI-compatible endpoint to summarize SCIDOCS topics. "
+            "If set, anchor vocabulary will be derived from the generated keywords instead of raw frequency counts."
+        ),
+    )
+    parser.add_argument(
+        "--topic_summary_endpoint",
+        default=os.environ.get("VLLM_ENDPOINT", ""),
+        help="Optional: base_url for the vLLM/OpenAI-compatible endpoint (e.g., http://localhost:8000/v1)",
+    )
+    parser.add_argument(
+        "--topic_summary_max_docs",
+        type=int,
+        default=200,
+        help=(
+            "How many SCIDOCS evaluation documents to summarize for topic anchors. "
+            "A random sample of titles+abstracts will be sent to the vLLM endpoint."
+        ),
+    )
+    parser.add_argument(
+        "--topic_keywords_per_chunk",
+        type=int,
+        default=48,
+        help="How many keywords to request from the vLLM summarizer per prompt chunk.",
+    )
+    parser.add_argument(
+        "--min_anchor_overlap",
+        type=int,
+        default=0,
+        help=(
+            "Filter out queries with fewer than this many shared tokens inside the domain anchor vocabulary. "
+            "0 disables anchor filtering."
+        ),
+    )
+    parser.add_argument(
+        "--anchor_vocab_size",
+        type=int,
+        default=8000,
+        help="Number of most common tokens from SciDocs metadata to keep for domain anchoring; 0 disables the vocabulary.",
+    )
+    parser.add_argument(
+        "--anchor_min_token_len",
+        type=int,
+        default=3,
+        help="Minimum token length when constructing and applying the anchor vocabulary.",
+    )
 
     return parser.parse_args()
 
@@ -209,6 +260,113 @@ def _passes_filters(doc: DocRecord, *, fos_filter: Optional[str], min_year: Opti
     return True
 
 
+def _tokenize(text: str, *, min_len: int) -> List[str]:
+    return [tok for tok in re.findall(r"[A-Za-z]+", text.lower()) if len(tok) >= min_len]
+
+
+def _build_anchor_vocab(
+    doc_store: Dict[str, DocRecord],
+    *,
+    vocab_size: int,
+    min_token_len: int,
+) -> Set[str]:
+    """
+    Build a SciDocs-aware anchor vocabulary from non-eval abstracts/titles to filter out out-of-domain pairs.
+    """
+    counter: Counter[str] = Counter()
+    if vocab_size <= 0:
+        return set()
+
+    for _, rec in doc_store.items():
+        counter.update(_tokenize(rec.text, min_len=min_token_len))
+
+    return {tok for tok, _ in counter.most_common(vocab_size)}
+
+
+def _ensure_openai() -> "openai":
+    import importlib
+
+    if importlib.util.find_spec("openai") is None:
+        raise RuntimeError(
+            "The 'openai' package is required for vLLM keyword summarization. Install with `pip install openai>=1.0`."
+        )
+    import openai
+
+    return openai
+
+
+def _summarize_scidocs_topics_with_vllm(
+    *,
+    model: str,
+    endpoint: str,
+    max_docs: int,
+    keywords_per_chunk: int,
+    anchor_min_token_len: int,
+    seed: int,
+) -> Set[str]:
+    """
+    Use a vLLM/OpenAI-compatible endpoint to summarize SCIDOCS evaluation topics into a keyword anchor set.
+    """
+    if not model:
+        return set()
+    if not endpoint:
+        raise RuntimeError("--topic_summary_endpoint (or VLLM_ENDPOINT env var) is required when --topic_summary_model is set")
+
+    openai = _ensure_openai()
+    client = openai.OpenAI(base_url=endpoint, api_key=os.environ.get("OPENAI_API_KEY", "EMPTY"))
+
+    eval_ds = _load_scirepeval("scidocs", preferred="train")
+    rows = list(eval_ds)
+    rng = random.Random(seed)
+    rng.shuffle(rows)
+    rows = rows[:max_docs] if max_docs > 0 else rows
+
+    payloads: List[str] = []
+    for row in rows:
+        title, abstract, _ = _get_title_abs(row.get("source") or row.get("doc") or row)
+        snippet = f"Title: {title}".strip()
+        if abstract:
+            snippet += f" | Abstract: {abstract}"
+        payloads.append(snippet[:800])
+
+    anchor_tokens: Set[str] = set()
+    chunk_size = 12
+    for i in range(0, len(payloads), chunk_size):
+        chunk = "\n".join(payloads[i : i + chunk_size])
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert scientific curator. Extract distinct topical keywords (nouns/noun phrases) that best "
+                    "summarize the research themes across the provided SCIDOCS papers. "
+                    "Return ONLY a comma-separated list without numbering or extra text."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Paper snippets:\n{chunk}\n\nRespond with {keywords_per_chunk} keywords, concise and lower-case."
+                ),
+            },
+        ]
+
+        resp = client.chat.completions.create(model=model, messages=messages, temperature=0.2, max_tokens=128)
+        text = resp.choices[0].message.content or ""
+        for tok in re.split(r"[,\n]+", text):
+            tok = tok.strip().lower()
+            if len(tok) >= anchor_min_token_len:
+                anchor_tokens.add(tok)
+
+    return anchor_tokens
+
+
+def _passes_anchor(text: str, anchor_vocab: Set[str], *, min_overlap: int, min_token_len: int) -> bool:
+    if min_overlap <= 0 or not anchor_vocab:
+        return True
+    overlap = anchor_vocab.intersection(_tokenize(text, min_len=min_token_len))
+    return len(overlap) >= min_overlap
+
+
 def build_samples(
     *,
     citation_ds: Dataset,
@@ -221,6 +379,9 @@ def build_samples(
     min_text_len: int,
     pos_per_query: int,
     neg_per_query: int,
+    anchor_vocab: Set[str],
+    min_anchor_overlap: int,
+    anchor_min_token_len: int,
 ) -> List[dict]:
     """
     Desired output:
@@ -243,13 +404,17 @@ def build_samples(
 
         if not qid or not pid or not nid:
             continue
-        if qid in scidocs_eval_ids or pid in scidocs_eval_ids or nid in scidocs_eval_ids:
+        # Only block evaluation IDs when they are used as queries; allow pos/neg to keep distributional coverage.
+        if qid in scidocs_eval_ids:
             continue
         if pid == nid:
             continue
 
         # query: title only
         if not q_title:
+            continue
+
+        if not _passes_anchor(q_title, anchor_vocab, min_overlap=min_anchor_overlap, min_token_len=anchor_min_token_len):
             continue
 
         # pos/neg: abstract (fallback to title if abstract missing)
@@ -397,6 +562,21 @@ def main() -> None:
     if args.mteb_qrels_dir:
         scidocs_eval_ids |= _load_mteb_qrels_ids(args.mteb_qrels_dir)
 
+    topic_anchor = _summarize_scidocs_topics_with_vllm(
+        model=args.topic_summary_model,
+        endpoint=args.topic_summary_endpoint,
+        max_docs=args.topic_summary_max_docs,
+        keywords_per_chunk=args.topic_keywords_per_chunk,
+        anchor_min_token_len=args.anchor_min_token_len,
+        seed=args.seed,
+    )
+
+    anchor_vocab = topic_anchor or _build_anchor_vocab(
+        doc_store,
+        vocab_size=args.anchor_vocab_size,
+        min_token_len=args.anchor_min_token_len,
+    )
+
 
     try:
         citation_ds = load_dataset("allenai/scirepeval", "cite_prediction_new", split="train")
@@ -417,6 +597,9 @@ def main() -> None:
         min_text_len=args.min_text_len,
         pos_per_query=args.pos_per_query,
         neg_per_query=args.neg_per_query,
+        anchor_vocab=anchor_vocab,
+        min_anchor_overlap=args.min_anchor_overlap,
+        anchor_min_token_len=args.anchor_min_token_len,
     )
 
     save_jsonl(samples, output_path)
