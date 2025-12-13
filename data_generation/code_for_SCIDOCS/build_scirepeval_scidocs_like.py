@@ -207,7 +207,8 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=200,
         help=(
-            "How many SCIDOCS evaluation documents to summarize for topic anchors. "
+            "How many SCIDOCS evaluation documents to summarize for topic anchors; "
+            "0 or negative values will use the full evaluation set. "
             "A random sample of titles+abstracts will be sent to the vLLM endpoint."
         ),
     )

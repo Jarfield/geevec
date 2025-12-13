@@ -53,21 +53,38 @@ MODEL_NAME="Qwen2-5-72B-Instruct" PORT=8000 NUM_PROCESSES=8 \
 - **锚点只约束 query，不过滤 doc**：我们只要求 query title 与锚点有足够重叠，用于挑选「确实是目标主题的查询」。Pos/Neg 文档保持原始分布，不再因为锚点缺失被丢弃，从而缓解之前“doc 被过滤导致分布差异化”的问题。
 - **继续年份/FOS 过滤**：如果 doc 有元数据，则仍按 `--min_year` / `--fos` 过滤，避免过早或偏题论文。
 
-### 使用方式
+### 使用方式（含全量测试集跑法）
 - 仍在 `run_stage_a.sh` 的基础上运行，新增可调参数：
   - `--topic_summary_model`：启用 vLLM/开放接口的模型名（例如 `qwen2.5-32b-instruct`）。为空则使用高频词锚点。
   - `--topic_summary_endpoint`：vLLM/OpenAI 兼容的 base_url（可设 `VLLM_ENDPOINT=http://localhost:8000/v1`）。
-  - `--topic_summary_max_docs`：摘要入 prompt 的评测文档数量上限，默认 200。
+  - `--topic_summary_max_docs`：摘要入 prompt 的评测文档数量上限，默认 200；当置为 `0` 或 `-1` 时会自动 **使用全部 SCIDOCS 测试集**（脚本已内置分块调用，不会因 token 过长报错）。
   - `--topic_keywords_per_chunk`：每个 prompt chunk 期望返回的关键词数量，默认 48。
   - `--anchor_vocab_size` / `--anchor_min_token_len` / `--min_anchor_overlap`：保留，作为高频词后备或调节 query 过滤强度；`--min_anchor_overlap>0` 时只作用于 query。
-- 示例：
-```bash
-cd data_generation/code_for_SCIDOCS
-VLLM_ENDPOINT=http://localhost:8000/v1 \
-./run_stage_a.sh --topic_summary_model qwen2.5-32b-instruct \
-                 --topic_summary_max_docs 300 \
-                 --min_anchor_overlap 3
-```
+- 推荐流程：
+  1. **先启动 vLLM 服务**（Terminal A）：例如
+     ```bash
+     CUDA_VISIBLE_DEVICES=0,1,2,3 python -m vllm.entrypoints.openai.api_server \
+         --model /data/share/project/shared_models/Qwen/Qwen2.5-72B-Instruct \
+         --served-model-name Qwen2-5-72B-Instruct \
+         --tensor-parallel-size 4 \
+         --port 8000 \
+         --trust-remote-code
+     ```
+     等待 `Application startup complete.` 后再继续。
+  2. **再运行 Stage A（Terminal B）**：示例 1——跑全量测试集做主题锚点
+     ```bash
+     cd data_generation/code_for_SCIDOCS
+     export VLLM_ENDPOINT="http://localhost:8000/v1"
+     ./run_stage_a.sh --topic_summary_model "Qwen2-5-72B-Instruct" \
+                      --topic_summary_max_docs -1 \
+                      --min_anchor_overlap 3
+     ```
+     示例 2——继续采样（非全量）时可改回默认 200：
+     ```bash
+     ./run_stage_a.sh --topic_summary_model "Qwen2-5-72B-Instruct" \
+                      --topic_summary_max_docs 200 \
+                      --min_anchor_overlap 3
+     ```
 
 ### 为什么能缓解分布差异
 - **锚点紧贴评测主题**：直接用 vLLM 对 SCIDOCS 测试集做主题总结，锚点词表由真实评测主题驱动，减少领域错配。
