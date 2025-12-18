@@ -7,4 +7,4 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-python3 "${SCRIPT_DIR}/download_model.py" "$@"
+python3 "${SCRIPT_DIR}/../code/download_model.py" "$@"

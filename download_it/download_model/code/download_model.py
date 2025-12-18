@@ -14,6 +14,8 @@ from typing import Iterable, Optional, Sequence
 
 from huggingface_hub import snapshot_download
 
+DEFAULT_MODEL_ROOT = Path("/data/share/project/shared_models")
+
 
 def _as_sequence(value: Optional[Sequence[str]]) -> Optional[Sequence[str]]:
     if not value:
@@ -25,8 +27,7 @@ def _default_local_dir(repo_id: str, override: Optional[str]) -> Path:
     if override:
         base_dir = Path(override)
     else:
-        base_root = Path(os.environ.get("BASE_MODEL_DIR", Path.cwd()))
-        base_dir = base_root / "hf_models" / repo_id.replace("/", "__")
+        base_dir = DEFAULT_MODEL_ROOT / repo_id.replace("/", "__")
     base_dir.mkdir(parents=True, exist_ok=True)
     return base_dir
 
