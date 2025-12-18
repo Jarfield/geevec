@@ -15,19 +15,19 @@ results_output_folder="$eval_root/result/evaluation"
 cd "$eval_root/code/evaluation/code" || exit 1
 
 tasks=(
-  # "AILAStatutes"
-  # "ArguAna"
-  # "BelebeleRetrieval"
+  "AILAStatutes"
+  "ArguAna"
+  "BelebeleRetrieval"
   "CovidRetrieval"
-  # "SCIDOCS"
-  # "SpartQA"
-  # "TRECCOVID"
-  # "WinoGrande"
-  # "StatcanDialogueDatasetRetrieval"
-  # "TwitterHjerneRetrieval"
+  "SCIDOCS"
+  "SpartQA"
+  "TRECCOVID"
+  "WinoGrande"
+  "StatcanDialogueDatasetRetrieval"
+  "TwitterHjerneRetrieval"
 )
 
-model_path="/data/share/project/psjin/model/geevec-qwen3-8b-v4/CovidRetrieval/merged_model"
+model_path="/data/share/project/shared_models/bge-multilingual-gemma2"
 
 # 源文件路径列表
 required_files=(
@@ -65,15 +65,14 @@ copy_required_files() {
 copy_required_files
 
 for task in "${tasks[@]}"; do
-    out_dir="$results_output_folder/geevec-qwen3-8b-v4/$task"
+    out_dir="$results_output_folder/bge-multilingual-gemma2/$task"
     mkdir -p "$out_dir"
     cmd="CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python main.py \
         --benchmark_name \"$task\" \
         --results_output_folder \"$out_dir\" \
         --model_name_or_path \"$model_path\" \
-        --use_fp16 False \
-        --use_bf16 True \
-        --prompt_template 'Instruct: {}\nQuery: ' \
+        --use_fp16 True \
+        --prompt_template '<instruct>{}\n<query>' \
         --assert_prompts_exist True \
         --normalize_embeddings True \
         --batch_size 8 \
@@ -84,4 +83,4 @@ for task in "${tasks[@]}"; do
 done
 
 python "$eval_root/code/evaluation/code/summary.py" \
-    "$results_output_folder/geevec-qwen3-8b-v4" \
+    "$results_output_folder/bge-multilingual-gemma2" \

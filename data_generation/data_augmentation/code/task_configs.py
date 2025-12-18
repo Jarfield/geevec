@@ -49,7 +49,7 @@ class TaskDatasetConfig:
 
 
 # You can change this root once to redirect all default paths.
-DEFAULT_DATA_ROOT = os.environ.get("DATA_AUG_ROOT", "/data/share/project/shared_datasets")
+DEFAULT_DATA_ROOT = os.environ.get("DATA_AUG_ROOT", "/data/share/project/shared_datasets/.cache")
 DEFAULT_GENERATED_ROOT = os.environ.get(
     "DATA_AUG_GENERATED_ROOT",
     "/data/share/project/psjin/data/generated_data",
@@ -108,15 +108,15 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
     "scidocs": TaskDatasetConfig(
         corpus_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "MMTEB/mteb___scidocs/corpus/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-corpus.arrow"
+            "mteb___scidocs/corpus/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-corpus.arrow"
         ),
         queries_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "MMTEB/mteb___scidocs/queries/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-queries.arrow",
+            "mteb___scidocs/queries/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-queries.arrow",
         ),
         qrels_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "MMTEB/mteb___scidocs/default/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-test.arrow",
+            "mteb___scidocs/default/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-test.arrow",
         ),
         min_len=200,
         text_key="text",

@@ -48,15 +48,15 @@ synthetic_train_data="\
     /data/share/project/psjin/data/generated_data/scidocs/generation_results/hn_mine_data/en/scidocs \
     "
 train_data="\
-    /data/share/project/psjin/data/generated_data/covidretrieval/generation_results/hn_mine_data_scored/zh/covidretrieval
+    /data/share/project/psjin/data/generated_data/scidocs/scirep_train/en_scirep_base_filtered_cleaned.jsonl \
 "
     
 # set large epochs and small batch size for testing
-num_train_epochs=2
+num_train_epochs=1
 per_device_train_batch_size=32
 sub_batch_size=16
 num_gpus=8
-task_type="covidretrieval"
+task_type="SCIDOCS"
 
 export HF_HUB_CACHE="/data/share/project/shared_models/.cache"
 export HF_DATASETS_CACHE="/data/share/project/shared_datasets/.cache"
@@ -85,7 +85,7 @@ data_args="\
 "
 
 training_args="\
-    --output_dir /data/share/project/psjin/model/geevec-qwen3-8b-v4/$task_type \
+    --output_dir /data/share/project/psjin/model/geevec-qwen3-8b-v5/$task_type \
     --learning_rate 1e-4 \
     --fp16 False \
     --bf16 True \
@@ -103,13 +103,11 @@ training_args="\
     --sentence_pooling_method last_token \
     --normalize_embeddings True \
     --kd_loss_type kl_div \
-    --max_example_num_per_dataset 50000 \
-
+    --max_example_num_per_dataset 10000 \
 "
 #   --overwrite_output_dir \
 
 cmd="CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --nproc_per_node $num_gpus \
-    --master_port 29500 \
     -m FlagEmbedding.finetune.embedder.decoder_only.base \
     $model_args \
     $data_args \
