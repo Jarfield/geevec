@@ -9,6 +9,8 @@ from typing import Iterable, List, Optional, Sequence
 
 from datasets import load_dataset
 
+DEFAULT_DATASET_ROOT = Path("/data/share/project/shared_datasets")
+
 
 def _as_list(items: Optional[Sequence[str]]) -> List[str]:
     if not items:
@@ -36,8 +38,8 @@ def _parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--cache-dir",
-        default=os.environ.get("HF_DATASETS_CACHE"),
-        help="Cache directory for datasets; defaults to $HF_DATASETS_CACHE when set.",
+        default=os.environ.get("HF_DATASETS_CACHE", DEFAULT_DATASET_ROOT),
+        help="Cache directory for datasets; defaults to $HF_DATASETS_CACHE when set, or a shared datasets path otherwise.",
     )
     parser.add_argument(
         "--revision",
@@ -64,6 +66,8 @@ def _parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
 
 
 def download_dataset(args: argparse.Namespace) -> None:
+    cache_dir = Path(args.cache_dir) if args.cache_dir else DEFAULT_DATASET_ROOT
+    cache_dir.mkdir(parents=True, exist_ok=True)
     splits = _as_list(args.splits) or ["train"]
     for split in splits:
         print(f"Downloading split '{split}' for dataset '{args.dataset}'...")
@@ -71,14 +75,13 @@ def download_dataset(args: argparse.Namespace) -> None:
             path=args.dataset,
             name=args.subset,
             split=split,
-            cache_dir=args.cache_dir,
+            cache_dir=cache_dir,
             revision=args.revision,
             token=args.token,
             trust_remote_code=args.trust_remote_code,
             data_files=args.data_files,
         )
-    resolved_cache = Path(args.cache_dir) if args.cache_dir else Path.home()
-    print(f"Datasets cached under: {resolved_cache.resolve()}")
+    print(f"Datasets cached under: {cache_dir.resolve()}")
 
 
 def main() -> None:
