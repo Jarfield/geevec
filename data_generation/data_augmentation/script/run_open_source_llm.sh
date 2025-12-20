@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export HF_HUB_CACHE="/data/share/project/shared_models/.cache"
-export HF_DATASETS_CACHE="/data/share/project/shared_datasets/.cache"
 export TORCHINDUCTOR_CACHE_DIR="/data/share/project/.cache/torch_compile"
 export TRITON_CACHE_DIR="/data/share/project/.cache/triton"
 
@@ -15,7 +13,7 @@ SERVE_NAME="${SERVE_NAME:-Qwen2-5-72B-Instruct}"
 MAX_LENGTH="${MAX_LENGTH:-32768}"
 PARALLEL_SIZE="${PARALLEL_SIZE:-8}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.9}"
-DEPLOY_SCRIPT="${DEPLOY_SCRIPT:-${REPO_ROOT}/data_generation/code_for_AILAStatutes/vllm_deploy/run_open_source_llm.py}"
+DEPLOY_SCRIPT="${DEPLOY_SCRIPT:-${REPO_ROOT}/data_generation/data_augmentation/code/run_open_source_llm.py}"
 
 "${PYTHON_BIN}" "${DEPLOY_SCRIPT}" \
 --model_path "${MODEL_PATH}" \

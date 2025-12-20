@@ -56,7 +56,6 @@ def main(args):
                 pass
         print("Data download completed.")
         return
-
     # ---- evaluation mode ----
     print("Running evaluation...")
     evaluation = mteb.MTEB(tasks=tasks)

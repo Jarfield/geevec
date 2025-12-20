@@ -13,7 +13,7 @@
 - **`QueryDocPairScorer.score_item` / `run`**：批量遍历 mined 数据（`query` + `pos/neg/topk`），根据阈值切分正例 / 难负例并保存 `score_details`。
 - **`load_generated_corpus`（code/run_generation.py）**：读取 `run_corpus_generation.py` 产出的合成语料（`.jsonl` 或 Arrow`），只要含有 `text/desc` 字段即保留，可选 `num_samples` 截断。
 - **`load_examples_pool`（code/run_generation.py）**：加载 few-shot 示例，兼容 JSON / JSONL，并自动将不同字段名映射成 `{input, output}` 结构（支持 `input/context/content/text/doc/document/pos/positive/passage` 与 `output/target/query/question/label`），缺失字段会被跳过。
-- **`gen_triplets`（code/run_generation.py` + `triplet_generator.py`）**：包装 `TripletGenerator.run`，按进程数并行生成查询与正例。
+- **`gen_triplets`（`code/run_generation.py` + `triplet_generator.py`）**：包装 `TripletGenerator.run`，按进程数并行生成查询与正例。
 - **`save_triplets` / `save_triplets_for_round`（code/run_generation.py）**：单轮 / 多轮模式下落盘三元组，自动创建目录并按语言、任务组织文件名。
 - **`TripletGenerator.generate_triplets`（code/triplet_generator.py）**：对单条文档构造 Prompt 并调用 `LLM.chat`；可选 few-shot 示例与叙事焦点（`narrative_focus`）。
 - **`TripletGenerator.run_single`**：提供缓存与重试入口；若指定 `cache_dir`，同一文档会复用历史生成结果。

@@ -1,33 +1,25 @@
 #!/bin/bash
-
-# set huggingface mirror
-export HF_ENDPOINT=https://hf-mirror.com
-export MTEB_CACHE="/data/share/project/shared_datasets/mteb"
-
-# set model cache dir
-export HF_HUB_CACHE="/data/share/project/shared_models/.cache"
-export HF_DATASETS_CACHE="/data/share/project/shared_datasets/.cache"
-
-# activate environment
+# 1. 基础路径设置
 eval_root="/data/share/project/psjin"
 results_output_folder="$eval_root/result/evaluation"
 
+# 2. 进入代码目录
 cd "$eval_root/code/evaluation/code" || exit 1
 
 tasks=(
-  "AILAStatutes"
-  "ArguAna"
-  "BelebeleRetrieval"
-  "CovidRetrieval"
-  "SCIDOCS"
-  "SpartQA"
-  "TRECCOVID"
-  "WinoGrande"
-  "StatcanDialogueDatasetRetrieval"
-  "TwitterHjerneRetrieval"
+  # "AILAStatutes"
+  # "ArguAna"
+  # "BelebeleRetrieval"
+  # "CovidRetrieval"
+  # "SCIDOCS"
+  # "SpartQA"
+  # "TRECCOVID"
+  # "WinoGrande"
+  # "StatcanDialogueDatasetRetrieval"
+  # "TwitterHjerneRetrieval"
 )
 
-model_path="/data/share/project/shared_models/bge-multilingual-gemma2"
+model_path="/data/share/project/shared_models/nvidia__llama-embed-nemotron-8b"
 
 # 源文件路径列表
 required_files=(
@@ -62,25 +54,34 @@ copy_required_files() {
   done
 }
 # 调用函数来复制文件
-copy_required_files
+# copy_required_files
 
 for task in "${tasks[@]}"; do
-    out_dir="$results_output_folder/bge-multilingual-gemma2/$task"
+    out_dir="$results_output_folder/nvidia__llama-embed-nemotron-8b__check/$task"
     mkdir -p "$out_dir"
+    
+    # 修改点：
+    # 1. 修正 prompt_template 匹配官方文档
+    # 2. 增加 trust_remote_code
+    # 3. 建议使用 BF16 代替 FP16
     cmd="CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python main.py \
         --benchmark_name \"$task\" \
         --results_output_folder \"$out_dir\" \
         --model_name_or_path \"$model_path\" \
-        --use_fp16 True \
-        --prompt_template '<instruct>{}\n<query>' \
+        --use_bf16 True \
+        --use_fp16 False \
+        --trust_remote_code True \
+        --prompt_template 'Instruct: {}\nQuery: ' \
         --assert_prompts_exist True \
         --normalize_embeddings True \
-        --batch_size 8 \
-        --max_length 512 \
-        "
+        --batch_size 4 \
+        --max_length 512"
+    
     echo "$cmd"
     eval "$cmd"
 done
 
+# 3. 修正 Summary 路径：指向刚刚跑完的模型文件夹
+echo "Generating Summary..."
 python "$eval_root/code/evaluation/code/summary.py" \
-    "$results_output_folder/bge-multilingual-gemma2" \
+    "$results_output_folder/nvidia__llama-embed-nemotron-8b__check"
