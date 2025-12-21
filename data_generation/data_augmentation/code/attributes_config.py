@@ -14,7 +14,15 @@ import random
 from dataclasses import dataclass, asdict
 from typing import Dict, Any, List, Optional
 
-from constant import TaskType, Task, get_doc_synthesis_prompt
+import os
+import sys
+
+THIS_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+from data_generation.shared.constants import TaskType, Task, get_doc_synthesis_prompt
 
 # ======================== 通用属性定义 ========================
 @dataclass

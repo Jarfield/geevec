@@ -10,22 +10,24 @@ from tqdm import tqdm
 
 # ---- Make project root & this folder importable ----
 THIS_DIR = os.path.dirname(__file__)
-ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, "..", ".."))
-for _p in (ROOT_DIR, THIS_DIR):
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
+for _p in (PROJECT_ROOT, THIS_DIR):
     if _p not in sys.path:
         sys.path.append(_p)
 
-from constant import TaskType, Language  # type: ignore
+from data_generation.shared.constants import Language, TaskType  # type: ignore
+from data_generation.data_preparation.code.task_configs import DEFAULT_GENERATED_ROOT
 from corpus_generator import CorpusGenerator  # type: ignore
 from doc_synthesis_generator import DocSynthesisGenerator
-from task_configs import DEFAULT_GENERATED_ROOT
 
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
+        "--task",
         "--task_type",
+        dest="task_type",
         type=str,
         default="covidretrieval",
         choices=[t.name for t in TaskType],
