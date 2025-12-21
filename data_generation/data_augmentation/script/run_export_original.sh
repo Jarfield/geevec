@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 将原始元数据（corpus + queries + qrels）转换为训练三元组格式。
-# 数据路径与字段名默认从 code/task_configs.py 读取，通常只需设置 TASK_TYPE/LANGUAGE。
+# 数据路径与字段名默认从 data_preparation/code/task_configs.py 读取，通常只需设置 TASK_TYPE/LANGUAGE。
 
 TASK_TYPE=${TASK_TYPE:-scidocs}
 LANGUAGE=${LANGUAGE:-en}

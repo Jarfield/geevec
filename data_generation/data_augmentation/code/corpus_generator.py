@@ -1,13 +1,19 @@
 """Task-aware corpus loader used by query and corpus generation scripts."""
 
 import os
+import sys
 import random
-from typing import List, Tuple
+from typing import List
 
 from datasets import Dataset, load_dataset
 from tqdm import tqdm
 
-from task_configs import get_task_config, TaskDatasetConfig
+THIS_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+from data_generation.data_preparation.code.task_configs import TaskDatasetConfig, get_task_config
 
 
 def _load_qrels_ids(qrels_path: str, cfg: TaskDatasetConfig) -> set:

@@ -1,9 +1,9 @@
 import os
+import sys
 import json
 import random
 import numpy as np
 from tqdm import tqdm
-from hashlib import md5
 from typing import Optional, List
 from dataclasses import dataclass, field
 from datasets import Dataset
@@ -13,15 +13,14 @@ from transformers import HfArgumentParser
 from FlagEmbedding import FlagAutoModel
 from FlagEmbedding.abc.inference import AbsEmbedder
 
-# 💡 引入 task_configs 相关函数
-from task_configs import get_task_config # <-- 引入 get_task_config
-# from task_configs import default_generated_corpus_path # 如果你不需要，可以移除
-# 💡 确保引入了 get_task
-from constant import get_task 
+THIS_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 
-
-def compute_md5(text: str):
-    return md5(text.encode()).hexdigest()
+from data_generation.data_preparation.code.task_configs import get_task_config  # <-- 引入 get_task_config
+from data_generation.shared.constants import get_task
+from data_generation.shared.utils import compute_md5
 
 # ====================================================================
 # 💡 修正 1：将 get_corpus_dict 和 get_corpus_from_arrow 提前

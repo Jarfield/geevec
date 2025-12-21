@@ -10,13 +10,23 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from typing import Dict, Iterable, List, Optional, Set
 
 from datasets import Dataset, load_dataset
 from tqdm import tqdm
 
-from constant import Language, TaskType, get_task
-from task_configs import DEFAULT_ORIGINAL_ROOT, TaskDatasetConfig, get_task_config
+THIS_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+from data_generation.shared.constants import Language, TaskType, get_task
+from data_generation.data_preparation.code.task_configs import (
+    DEFAULT_ORIGINAL_ROOT,
+    TaskDatasetConfig,
+    get_task_config,
+)
 
 
 def _load_dataset(path: str) -> Dataset:

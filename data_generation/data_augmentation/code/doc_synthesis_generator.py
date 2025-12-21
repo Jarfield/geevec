@@ -10,17 +10,15 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tqdm import tqdm
 
-# ---- 确保当前目录可被 import ----
 THIS_DIR = os.path.dirname(__file__)
-ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, "..", ".."))
-for _p in (ROOT_DIR, THIS_DIR):
-    if _p not in sys.path:
-        sys.path.append(_p)
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 
-from constant import TaskType, Language, get_task, Task  # type: ignore
-from llm import LLM  # type: ignore
-from utils import clean_content  # type: ignore
-from attributes_config import (
+from data_generation.shared.constants import Language, Task, TaskType, get_task  # type: ignore
+from data_generation.shared.llm import LLM  # type: ignore
+from data_generation.shared.utils import clean_content  # type: ignore
+from attributes_config import (  # type: ignore
     sample_attributes_for_task,
     attributes_to_hint_text,
     get_base_synthesis_prompt,

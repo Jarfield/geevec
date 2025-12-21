@@ -1,9 +1,15 @@
 import argparse
 import json
 import os
+import sys
 from typing import List
 
-from constant import TaskType, Language
+THIS_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+from data_generation.shared.constants import Language, TaskType
 from query_doc_pair_scorer import QueryDocPairScorer
 
 
@@ -26,7 +32,7 @@ def save_data(data: List[dict], save_path: str) -> None:
 
 def get_args():
     parser = argparse.ArgumentParser(description="Score query-doc pairs to filter mined negatives.")
-    parser.add_argument("--task_type", type=str, required=True, choices=[t.name for t in TaskType])
+    parser.add_argument("--task", "--task_type", dest="task_type", type=str, required=True, choices=[t.name for t in TaskType])
     parser.add_argument("--language", type=str, default="en", choices=[l.name for l in Language])
     parser.add_argument("--input_path", type=str, required=True, help="Input JSONL with query/pos/neg fields.")
     parser.add_argument("--output_path", type=str, required=True, help="Where to save scored results.")

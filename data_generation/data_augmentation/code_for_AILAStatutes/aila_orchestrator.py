@@ -8,11 +8,13 @@ from typing import Dict, Iterable, List, Optional
 # 将 data_augmentation 的 code 目录加入系统路径，复用公共 LLM 与生成器逻辑
 CURRENT_DIR = os.path.dirname(__file__)
 PARENT_CODE_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "code"))
-if PARENT_CODE_DIR not in sys.path:
-    sys.path.append(PARENT_CODE_DIR)
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", ".."))
+for _p in (PARENT_CODE_DIR, PROJECT_ROOT):
+    if _p not in sys.path:
+        sys.path.append(_p)
 
-from utils import clean_content  # type: ignore
-from llm import LLM  # type: ignore
+from data_generation.shared.utils import clean_content  # type: ignore
+from data_generation.shared.llm import LLM  # type: ignore
 from triplet_generator import TripletGenerator  # type: ignore
 from doc_synthesis_generator import DocSynthesisGenerator  # type: ignore
 

@@ -1,17 +1,18 @@
 import os
+import sys
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
-from hashlib import md5
 from typing import Dict, List, Optional
 
-from constant import Task, get_pair_scoring_prompt, get_task
-from llm import LLM
-from utils import clean_content
+THIS_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 
-
-def compute_md5(text: str) -> str:
-    return md5(text.encode()).hexdigest()
+from data_generation.shared.constants import Task, get_pair_scoring_prompt, get_task  # type: ignore
+from data_generation.shared.llm import LLM  # type: ignore
+from data_generation.shared.utils import clean_content, compute_md5  # type: ignore
 
 
 class QueryDocPairScorer(LLM):

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Resolve repository root and move into the code directory so imports work regardless of invocation location.
-REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)
-CODE_DIR="${REPO_ROOT}/code/data_generation/data_augmentation/code"
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+CODE_DIR="${REPO_ROOT}/data_augmentation/code"
 cd "${CODE_DIR}"
 
 # Core toggles (override via environment variables before running this script).

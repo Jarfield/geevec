@@ -1,19 +1,16 @@
 import os
 import json
 import random
-from tqdm import tqdm
-from hashlib import md5
-from warnings import warn
-from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor
+from typing import List, Optional
+from warnings import warn
 
-from llm import LLM
-from utils import clean_content
-from constant import Task, get_task, get_generation_prompt, get_quality_control_prompt
+from tqdm import tqdm
 
-
-def compute_md5(text: str):
-    return md5(text.encode()).hexdigest()
+from data_generation.shared.constants import Task, get_quality_control_prompt, get_task
+from data_generation.shared.llm import LLM
+from data_generation.shared.utils import clean_content, compute_md5
+from generator_core import build_generation_prompt
 
 
 class TripletGenerator(LLM):
@@ -61,7 +58,7 @@ class TripletGenerator(LLM):
                 )
 
             try:
-                gen_prompt = get_generation_prompt(
+                gen_prompt = build_generation_prompt(
                     task=task,
                     text=text,
                     examples=examples,
