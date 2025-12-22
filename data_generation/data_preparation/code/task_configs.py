@@ -49,20 +49,10 @@ class TaskDatasetConfig:
 
 
 # You can change this root once to redirect all default paths.
-DEFAULT_DATA_ROOT = os.environ.get("DATA_AUG_ROOT", "/data/share/project/shared_datasets/.cache")
-DEFAULT_GENERATED_ROOT = os.environ.get(
-    "DATA_AUG_GENERATED_ROOT",
-    "/data/share/project/psjin/data/generated_data",
-)
-DEFAULT_ORIGINAL_ROOT = os.environ.get(
-    "DATA_AUG_ORIGINAL_ROOT",
-    "/data/share/project/psjin/data/exported_original",
-)
-
-ARGUANA_DATA_ROOT = os.path.join(
-    DEFAULT_DATA_ROOT,
-    "shared_models/datasets--mteb--arguana/snapshots/c22ab2a51041ffd869aaddef7af8d8215647e41a",
-)
+DEFAULT_DATA_ROOT = "/data/share/project/shared_datasets/.cache/hf_datasets"
+DEFUALT_EXMPLAES_ROOT = "/data/share/project/psjin/data/examples"
+DEFAULT_GENERATED_ROOT = "/data/share/project/psjin/data/generated_data"
+DEFAULT_ORIGINAL_ROOT = "/data/share/project/psjin/data/original_data"
 
 def default_generated_corpus_path(task_type: str, language: str) -> str:
     """Return the expected path for the synthesized corpus of a task.
@@ -76,7 +66,6 @@ def default_generated_corpus_path(task_type: str, language: str) -> str:
     return os.path.join(
         DEFAULT_GENERATED_ROOT,
         task_type,
-        "generation_results",
         "generated_corpus",
         f"{language}_synth_corpus.jsonl",
     )
@@ -86,15 +75,15 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
     "covidretrieval": TaskDatasetConfig(
         corpus_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "MMTEB/C-MTEB___covid_retrieval/default/0.0.0/1271c7809071a13532e05f25fb53511ffce77117/covid_retrieval-corpus.arrow",
+            "C-MTEB___covid_retrieval/default/0.0.0/1271c7809071a13532e05f25fb53511ffce77117/covid_retrieval-corpus.arrow",
         ),
         queries_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "MMTEB/C-MTEB___covid_retrieval/default/0.0.0/1271c7809071a13532e05f25fb53511ffce77117/covid_retrieval-queries.arrow",
+            "C-MTEB___covid_retrieval/default/0.0.0/1271c7809071a13532e05f25fb53511ffce77117/covid_retrieval-queries.arrow",
         ),
         qrels_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "MMTEB/C-MTEB___covid_retrieval-qrels/default/0.0.0/a9f41b7cdf24785531d12417ce0d1157ed4b39ca/covid_retrieval-qrels-dev.arrow",
+            "C-MTEB___covid_retrieval-qrels/default/0.0.0/a9f41b7cdf24785531d12417ce0d1157ed4b39ca/covid_retrieval-qrels-dev.arrow",
         ),
         min_len=200,
         text_key="text",
@@ -103,12 +92,12 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
         query_text_key="text",
         qrels_qid_key="qid",
         qrels_pid_key="pid",
-        examples_dir=os.path.join(DEFAULT_DATA_ROOT, "data_generation/examples"),
+        examples_dir=os.path.join(DEFUALT_EXMPLAES_ROOT, "data_generation", "covidretrieval"),
     ),
     "scidocs": TaskDatasetConfig(
         corpus_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "mteb___scidocs/corpus/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-corpus.arrow"
+            "mteb___scidocs/corpus/0.0.0/955fa095d8dfece60ea5b5d8a1377a6e8b6c8b93/scidocs-corpus.arrow",
         ),
         queries_path=os.path.join(
             DEFAULT_DATA_ROOT,
@@ -127,11 +116,21 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
         qrels_qid_key="query-id",
         qrels_pid_key="corpus-id",
         qrels_score_key="score",
+        examples_dir=os.path.join(DEFUALT_EXMPLAES_ROOT, "data_generation", "scidocs"),
     ),
     "arguana": TaskDatasetConfig(
-        corpus_path=os.path.join(ARGUANA_DATA_ROOT, "corpus.jsonl"),
-        queries_path=os.path.join(ARGUANA_DATA_ROOT, "queries.jsonl"),
-        qrels_path=os.path.join(ARGUANA_DATA_ROOT, "qrels/test.jsonl"),
+        corpus_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "mteb___arguana/corpus/0.0.0/c035584c70e9a0e5738574ca5b3b929e2680238f/arguana-corpus.arrow",
+        ),
+        queries_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "mteb___arguana/queries/0.0.0/c035584c70e9a0e5738574ca5b3b929e2680238f/arguana-queries.arrow",
+        ),
+        qrels_path=os.path.join(
+            DEFAULT_DATA_ROOT,
+            "mteb___arguana/default/0.0.0/c035584c70e9a0e5738574ca5b3b929e2680238f/arguana-test.arrow",
+        ),
         min_len=200,
         text_key="text",
         title_key="title",
@@ -141,19 +140,20 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
         qrels_qid_key="query-id",
         qrels_pid_key="corpus-id",
         qrels_score_key="score",
+        examples_dir=os.path.join(DEFUALT_EXMPLAES_ROOT, "data_generation", "arguana"),
     ),
     "ailastatutes": TaskDatasetConfig(
         corpus_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "MMTEB/mteb___aila_statutes/corpus/0.0.0/ac23c06b6894334dd025491c6abc96ef516aad2b/aila_statutes-corpus.arrow",
+            "mteb___aila_statutes/corpus/0.0.0/ac23c06b6894334dd025491c6abc96ef516aad2b/aila_statutes-corpus.arrow",
         ),
         queries_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "MMTEB/mteb___aila_statutes/queries/0.0.0/ac23c06b6894334dd025491c6abc96ef516aad2b/aila_statutes-queries.arrow",
+            "mteb___aila_statutes/queries/0.0.0/ac23c06b6894334dd025491c6abc96ef516aad2b/aila_statutes-queries.arrow",
         ),
         qrels_path=os.path.join(
             DEFAULT_DATA_ROOT,
-            "MMTEB/mteb___aila_statutes/default/0.0.0/ac23c06b6894334dd025491c6abc96ef516aad2b/aila_statutes-test.arrow",
+            "mteb___aila_statutes/default/0.0.0/ac23c06b6894334dd025491c6abc96ef516aad2b/aila_statutes-test.arrow",
         ),
         min_len=200,
         text_key="text",
@@ -164,6 +164,7 @@ TASK_DATASETS: Dict[str, TaskDatasetConfig] = {
         qrels_qid_key="query-id",
         qrels_pid_key="corpus-id",
         qrels_score_key="score",
+        examples_dir=os.path.join(DEFUALT_EXMPLAES_ROOT, "data_generation", "ailastatutes"),
     ),
 }
 
@@ -181,6 +182,7 @@ __all__ = [
     "TaskDatasetConfig",
     "TASK_DATASETS",
     "DEFAULT_DATA_ROOT",
+    "DEFUALT_EXMPLAES_ROOT",
     "DEFAULT_GENERATED_ROOT",
     "DEFAULT_ORIGINAL_ROOT",
     "default_generated_corpus_path",

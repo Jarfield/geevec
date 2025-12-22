@@ -43,12 +43,15 @@ synthetic_train_data="\
     /data/share/project/psjin/data/generated_data/ailastatutes/generation_results/hn_mine_data_augmentation/en/ailastatutes  \
     /data/share/project/psjin/data/generated_data/ailastatutes/generation_results/hn_mine_data_merged/en/ailastatutes \
     /data/share/project/psjin/data/generated_data/arguana/generation_results/hn_mine_data/en/arguana \
-    /data/share/project/psjin/data/generated_data/covidretrieval/generation_results/hn_mine_data_cleaned/zh/covidretrieval\
-    /data/share/project/psjin/data/generated_data/covidretrieval/generation_results/hn_mine_data_augmentation/zh/covidretrieval \
+    /data/share/project/psjin/data/generated_data/covidretrieval/generation_results/hn_mine_data_scored/zh/covidretrieval \
     /data/share/project/psjin/data/generated_data/scidocs/generation_results/hn_mine_data/en/scidocs \
     "
 train_data="\
-    /data/share/project/psjin/data/generated_data/scidocs/scirep_train/en_scirep_base_filtered_cleaned.jsonl \
+    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/en/ArguAna\
+    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/en/MSMARCO\
+    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/en/SCIDOCS\
+    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/zh/mMARCO_zh\
+    /data/share/project/psjin/data/generated_data/covidretrieval/generation_results/hn_mine_data_scored/zh/covidretrieval \
 "
     
 # set large epochs and small batch size for testing
@@ -56,13 +59,11 @@ num_train_epochs=1
 per_device_train_batch_size=32
 sub_batch_size=16
 num_gpus=8
-task_type="SCIDOCS"
 
-export HF_HUB_CACHE="/data/share/project/shared_models/.cache"
-export HF_DATASETS_CACHE="/data/share/project/shared_datasets/.cache"
 model_args="\
-    --model_name_or_path  /data/share/project/shared_models/Qwen3-Embedding-8B\
+    --model_name_or_path /data/share/project/shared_models/nvidia__llama-embed-nemotron-8b \
     --cache_dir $HF_HUB_CACHE \
+    --trust_remote_code True \
     --use_lora True \
     --lora_rank 32 \
     --lora_alpha 64 \
@@ -72,7 +73,7 @@ model_args="\
 
 data_args="\
     --train_data $train_data \
-    --cache_path $HF_HUB_CACHE \
+    --cache_path $HF_DATASETS_CACHE \
     --train_group_size 8 \
     --query_max_len 512 \
     --passage_max_len 512 \
@@ -85,7 +86,7 @@ data_args="\
 "
 
 training_args="\
-    --output_dir /data/share/project/psjin/model/geevec-qwen3-8b-v5/$task_type \
+    --output_dir /data/share/project/psjin/model/geevec-nemotron-8b-v1 \
     --learning_rate 1e-4 \
     --fp16 False \
     --bf16 True \
@@ -103,7 +104,7 @@ training_args="\
     --sentence_pooling_method last_token \
     --normalize_embeddings True \
     --kd_loss_type kl_div \
-    --max_example_num_per_dataset 10000 \
+    --max_example_num_per_dataset 100000 \
 "
 #   --overwrite_output_dir \
 
