@@ -47,11 +47,7 @@ synthetic_train_data="\
     /data/share/project/psjin/data/generated_data/scidocs/generation_results/hn_mine_data/en/scidocs \
     "
 train_data="\
-    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/en/ArguAna\
     /data/share/project/shared_datasets/bge-multilingual-gemma2-data/en/MSMARCO\
-    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/en/SCIDOCS\
-    /data/share/project/shared_datasets/bge-multilingual-gemma2-data/zh/mMARCO_zh\
-    /data/share/project/psjin/data/generated_data/covidretrieval/generation_results/hn_mine_data_scored/zh/covidretrieval \
 "
     
 # set large epochs and small batch size for testing
@@ -61,7 +57,7 @@ sub_batch_size=16
 num_gpus=8
 
 model_args="\
-    --model_name_or_path /data/share/project/shared_models/nvidia__llama-embed-nemotron-8b \
+    --model_name_or_path /data/share/project/shared_models/Qwen3-8B-auto-eos \
     --cache_dir $HF_HUB_CACHE \
     --trust_remote_code True \
     --use_lora True \
@@ -86,7 +82,7 @@ data_args="\
 "
 
 training_args="\
-    --output_dir /data/share/project/psjin/model/geevec-nemotron-8b-v1 \
+    --output_dir /data/share/project/psjin/model/Qwen3-8B-MSMARCO/base \
     --learning_rate 1e-4 \
     --fp16 False \
     --bf16 True \
@@ -104,8 +100,8 @@ training_args="\
     --sentence_pooling_method last_token \
     --normalize_embeddings True \
     --kd_loss_type kl_div \
-    --max_example_num_per_dataset 100000 \
 "
+#   --max_example_num_per_dataset 100000 \
 #   --overwrite_output_dir \
 
 cmd="CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --nproc_per_node $num_gpus \

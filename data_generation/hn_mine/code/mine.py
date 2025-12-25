@@ -249,7 +249,7 @@ def find_knn_neg(
 ):
     # 💡 get_corpus_dict 现在已被提前定义，NameError 解决
     corpus_dict = get_corpus_dict(input_file) 
-    
+    print (f'corpus size from input file: {len(corpus_dict)}--------------')
     queries = []
     train_data = []
     poses = []
@@ -277,7 +277,6 @@ def find_knn_neg(
                     else:
                         # assume jsonl
                         corpus_dict.update(get_corpus_dict(cp))
-    # ... (其余 find_knn_neg 保持不变)
     
     # encode queries and poses
     print(f'inferencing embedding for queries (number={len(queries)})--------------')

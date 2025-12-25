@@ -20,13 +20,31 @@ if [[ "${OVERWRITE:-0}" == "1" ]]; then
   OVERWRITE_FLAG="--overwrite"
 fi
 
-python "${PROJECT_ROOT}/data_generation/data_preparation/code/item_filter.py" \
-  --task "${TASK}" \
-  --language "${LANGUAGE}" \
-  --item "${ITEM}" \
-  ${CORPUS_PATH:+--corpus_path "${CORPUS_PATH}"} \
-  ${QRELS_PATH:+--qrels_path "${QRELS_PATH}"} \
-  ${OUTPUT_PATH:+--output_path "${OUTPUT_PATH}"} \
-  ${QUERIES_PATH:+--queries_path "${QUERIES_PATH}"} \
-  ${OVERWRITE_FLAG}
+# task-language=( \
+#   "ailastatutes-en" \
+#   "arguana-en" \
+#   "covidretrieval-zh" \
+#   "scidocs-en" \
+# )
+# items=( "corpus" "pair" )
+# for tl in "${task-language[@]}"; do
+#   for i in "${items[@]}"; do
+    # t=${tl%-*}  # 从右向左删掉第一个 - 及其右边的内容 -> 得到 task
+    # l=${tl##*-} # 从左向右删掉最后一个 - 及其左边的内容 -> 得到 language
+    # TASK="${t}"
+    # LANGUAGE="${l}"
+    # ITEM="${i}"
+    echo "Running item filter for task: ${TASK}, language: ${LANGUAGE}, item: ${ITEM}"
+    python "${PROJECT_ROOT}/data_generation/data_preparation/code/item_filter.py" \
+    --task "${TASK}" \
+    --language "${LANGUAGE}" \
+    --item "${ITEM}" \
+    ${CORPUS_PATH:+--corpus_path "${CORPUS_PATH}"} \
+    ${QRELS_PATH:+--qrels_path "${QRELS_PATH}"} \
+    ${OUTPUT_PATH:+--output_path "${OUTPUT_PATH}"} \
+    ${QUERIES_PATH:+--queries_path "${QUERIES_PATH}"} \
+    ${OVERWRITE_FLAG}
+#   done
+# done
+
 
